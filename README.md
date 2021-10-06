@@ -57,9 +57,6 @@ This program depends on the following libraries.
 * ```-cheight <CellHeight>```  
 *Specify height of cells in pixels of resulting image.*  
 
-***Note: The width, height, cell width, and cell height parameters can be ommited and their values can be set, in order***  
-***Note: If one parameter is given, and the related parameter is not, the related parameter's value will be the value of the given parameter***  
-
 ## Examples  
 * ```mkmz -width 10 -height 15 -cwidth 10 -cheight 10```  
   *Generates maze with width 10, height 15, cell width 10, and cell height 10. Resulting image name is 10x15_maze.png*  
@@ -69,6 +66,12 @@ This program depends on the following libraries.
   *Generates maze with width 10, height 5, cell width 2, and cell height 2. Resulting image name is 10x5_maze.png*  
 * ```mkmz 10 10 -o mymaze```  
   *Generates maze with width 10, height 10, cell width 10, and cell height 10. Resulting image name is mymaze.png*  
+
+# Notes
+* ***The cell width and cell height parameters reflect the distance between walls, not the area between them. So with a cell width of 2 and a cell height of 2, each passagway (or white part of the cell) will be 1 pixel.***  
+* ***You can generate as big a maze as your computer will allow.***  
+* ***The width, height, cell width, and cell height parameters can be ommited and their values can be set, in order***  
+* ***If one parameter is given, and the related parameter is not, the related parameter's value will be the value of the given parameter***  
 
 ## Contact
 
