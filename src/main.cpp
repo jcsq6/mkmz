@@ -176,16 +176,16 @@ void display_progress(const double& progress) {
 	static int length = 16;
 	int cur = 1;
 	std::string nulls = "----------------";
-	std::cout << std::fixed << progress * 100 << "% [" + nulls + "]";
+	std::cout << std::fixed << progress * 100 << "% [" + nulls + "]" << std::flush;
 	std::string p = "";
 	while (progress < 1) {
 		if (progress * length >= cur) {
 			++cur;
 			p += "*";
-			std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + p + nulls.substr(0, 16 - p.length()) + "]";
+			std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + p + nulls.substr(0, 16 - p.length()) + "]" << std::flush;
 		}
 	}
-	std::cout << "\r" << std::fixed << 100.0 << "% [****************]\n";
+	std::cout << "\r" << std::fixed << 100.0 << "% [****************]" << std::endl;
 }
 
 maze generate_maze(maze_size width, maze_size height, std::ofstream& output_log) {
