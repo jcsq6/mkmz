@@ -1,7 +1,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/jcsq6/mkmz">
-    <img src="images/logo.png" alt="Logo" width="200" height="100">
+    <img src="images/logo.png" alt="Logo" width="800" height="400">
   </a>
 
   <p align="center">
