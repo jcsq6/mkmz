@@ -13,6 +13,14 @@
 
 The goal of this program was to be able to generate mazes of any size as large as your computer can. This includes ridiculously large mazes. If you have a lot of memory, by all means, generate a 1,000,000*1,000,000 maze! The mazes are also very customizable, meaning that they don't have to be square. The same applies to the cell width and height-- the cells don't have to be square cells.
 
+### Example Output  
+<br />
+<div align="center">
+  <a href="https://github.com/jcsq6/mkmz">
+    <img src="images/top.png" alt="example" width="453" height="153">
+  </a>
+</div>
+
 
 ### Built With
 
