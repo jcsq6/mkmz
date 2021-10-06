@@ -173,19 +173,19 @@ void handle_args(int argc, char* argv[], maze_size& cell_width, maze_size& cell_
 }
 
 void display_progress(const double& progress) {
-	static int length = 16;
+	static int length = 20;
 	int cur = 1;
-	std::string nulls = "----------------";
+	std::string nulls(length, '-');
 	std::cout << std::fixed << progress * 100 << "% [" + nulls + "]" << std::flush;
-	std::string p = "";
 	while (progress < 1) {
 		if (progress * length >= cur) {
+			nulls[cur - 1] = '*';
 			++cur;
-			p += "*";
-			std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + p + nulls.substr(0, 16 - p.length()) + "]" << std::flush;
+			std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + nulls + "]" << std::flush;
 		}
 	}
-	std::cout << "\r" << std::fixed << 100.0 << "% [****************]" << std::endl;
+	nulls.back() = '*';
+	std::cout << "\r" << std::fixed << 100.0 << "% [" + nulls + "]" << std::endl;
 }
 
 maze generate_maze(maze_size width, maze_size height, std::ofstream& output_log) {
