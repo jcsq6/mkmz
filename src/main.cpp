@@ -181,8 +181,8 @@ void display_progress(const double& progress) {
 		if (progress * length >= cur) {
 			nulls[cur - 1] = '*';
 			++cur;
-			std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + nulls + "]" << std::flush;
 		}
+		std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + nulls + "]" << std::flush;
 	}
 	nulls.back() = '*';
 	std::cout << "\r" << std::fixed << 100.0 << "% [" + nulls + "]" << std::endl;
