@@ -32,17 +32,31 @@ This program depends on the following libraries.
 * [zlib](https://zlib.net/)
 
 ### Prerequisites
+**Linux**
 * libpng  
-  ```sudo apt-get install libpng-dev```
+  `sudo apt-get install libpng-dev`
 * zlib  
-  ```sudo apt-get install zlib1g-dev```  
+  `sudo apt-get install zlib1g-dev`  
+  
+**Windows (Vcpkg)**  
+* libpng  
+  `vcpkg install libpng:x64-windows-static` *For building a static x64 executable*  
+* zlib  
+  `vcpkg install zlib:x64-windows-static` *For building a static x64 executable*  
 
 ### Building
-
-1. `mkdir build`
-2. `cd build`
-3. `cmake ..`  
-4. `make`  
+**Linux**
+  1. `mkdir build`
+  2. `cd build`
+  3. `cmake ..`  
+  4. `make` 
+ 
+**Windows (Vcpkg)**
+  1. `mkdir build`
+  2. `cd build`
+  3. `cmake -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static ..`
+  4. `msbuild mkmz.sln` *(From developer command prompt)*  
+      *Alternative: open solution and build from visual studio*
 
 ## Usage  
 **mkmz [*options*]** 
