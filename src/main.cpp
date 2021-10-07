@@ -9,9 +9,12 @@
 #include <fstream>
 
 #include <iostream>
-#include <thread>
 
 #include <png.h>
+
+#include <iomanip>
+
+#include <thread>
 
 void handle_args(int argc, char* argv[], maze_size& cell_width, maze_size& cell_height, maze_size& maze_width, maze_size& maze_height, bool& replace, std::string& name, std::ofstream& output_log);
 
@@ -184,7 +187,7 @@ void display_progress(const double& progress) {
 		}
 		std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + nulls + "]" << std::flush;
 	}
-	nulls.back() = '*';
+	nulls = std::string(length, '*');
 	std::cout << "\r" << std::fixed << 100.0 << "% [" + nulls + "]" << std::endl;
 }
 
