@@ -1,356 +1,429 @@
-#include "maze.h"
-
-#include <chrono>
-
-#include <string>
-
-#include <algorithm>
-
-#include <fstream>
-
 #include <iostream>
+#include <chrono>
+#include <fstream>
+#include <filesystem>
 
-#include <png.h>
+#include "maze.h"
+#include "image.h"
 
-#include <iomanip>
+void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint64_t &seed);
+
+void progress_bar(double progress)
+{
+    static constexpr int total = 20;
+
+    std::cout << "\r[";
+    int completed = progress * total;
+    for (int i = 0; i < completed; ++i)
+        std::cout.put('#');
+    for (int i = completed; i < total; ++i)
+        std::cout.put('-');
+    std::cout << "] ";
+    std::cout << static_cast<int>(progress * 100) << '%';
+    std::cout.flush();
+}
+
+void draw_image(const maze &mz, image &img, uint64_t cell_width, uint64_t cell_height, uint64_t wall_width, uint16_t *wall_color, uint16_t *cell_color);
+
+int main(int argc, char *argv[])
+{
+    std::string image_name;
+
+    uint64_t cell_width;
+    uint64_t cell_height;
+    uint64_t wall_width;
+
+    uint16_t wall_color[4];
+    uint16_t cell_color[4];
+
+    uint64_t maze_width, maze_height;
+
+    uint64_t seed;
+
+    process_args(argc, argv, image_name, maze_width, maze_height, cell_width, cell_height, wall_width, wall_color, cell_color, seed);
+
+    image res;
+
+    {
+        std::cout << "Generating maze...\n";
+        auto begin = std::chrono::high_resolution_clock::now();
+        maze m(maze_width, maze_height);
+
+        if (seed != -1)
+            m.set_seed(seed);
+
+        m.set_progress_callback(progress_bar);
+
+        try
+        {
+            // m.gen_recursive_backtracker();
+            m.gen_recursive_backtracker();
+        }
+        catch (const std::bad_alloc &e)
+        {
+            std::cout << e.what() << '\n';
+            return 1;
+        }
+
+        seed = m.get_seed();
+
+        std::cout << "\nMaze generation finished in " << std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - begin).count() << "s\n";
+
+        std::cout << "Drawing image...\n";
+        std::cout.flush();
+
+        begin = std::chrono::high_resolution_clock::now();
+
+        try
+        {
+            res = image((cell_width + wall_width) * m.width() + wall_width, (cell_height + wall_width) * m.height() + wall_width, 1, color_t::gray);
+        }
+        catch (const std::bad_alloc &e)
+        {
+            std::cout << "Could not allocate image.\n";
+            return 1;
+        }
+        catch (const std::length_error &e)
+        {
+            std::cout << "Image dimensions too large.\n";
+            return 1;
+        }
+
+        draw_image(m, res, cell_width, cell_height, wall_width, wall_color, cell_color);
+
+        std::cout << "\nImage drawing finished in " << std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - begin).count() << "s\n";
+    }
+
+    std::cout << "Writing image...\n";
+    auto begin = std::chrono::high_resolution_clock::now();
+    try
+    {
+        res.write(image_name, 9, progress_bar);
+    }
+    catch (const std::runtime_error &e)
+    {
+        std::cout << e.what() << '\n';
+        return 1;
+    }
+
+    std::cout << "\nImage write finished in " << std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - begin).count() << "s\n";
+
+    std::uintmax_t size = std::filesystem::file_size(image_name);
+    double d = size;
+    int i = 0;
+    for (; d >= 1024; d /= 1024, ++i);
+    d = static_cast<unsigned int>(d * 10) / 10.0;
+
+    std::cout << "\nMaze generated with the following properties: \n";
+    std::cout << "\tImage name: " << image_name << '\n';
+    std::cout << "\tImage size: " << d << "BKMGTPE"[i];
+    if (i)
+        std::cout << "B (" << size << ')';
+    std::cout << '\n';
+    std::cout << "\tImage dimensions: (" << res.width() << ", " << res.height() << ")\n";
+    std::cout << "\tMaze dimensions: (" << maze_width << ", " << maze_height << ")\n";
+    std::cout << "\tCell dimensions: (" << cell_width << ", " << cell_height << ")\n";
+    std::cout << "\tWall width: " << wall_width << '\n';
+    std::cout << "\tMaze seed: " << seed << '\n';
+}
+
+void draw_vert_line(image &img, uint64_t x, uint64_t y, uint64_t len, uint64_t width, const uint16_t *color)
+{
+    for (; width; --width, ++x)
+        img.draw_vertical_line(x, y, len, color);
+}
+
+void draw_horiz_line(image &img, uint64_t x, uint64_t y, uint64_t len, uint64_t width, const uint16_t *color)
+{
+    for (; width; --width, ++y)
+        img.draw_horizontal_line(x, y, len, color);
+}
 
 #include <thread>
 
-void handle_args(int argc, char* argv[], maze_size& cell_width, maze_size& cell_height, maze_size& maze_width, maze_size& maze_height, bool& replace, std::string& name, std::ofstream& output_log);
+void progress_task(const std::vector<std::size_t> &progress, std::size_t total)
+{
+    using namespace std::chrono_literals;
 
-maze generate_maze(maze_size width, maze_size height, std::ofstream& output_log);
-void generate_image(const maze& m, const std::string& name, maze_size maze_width, maze_size maze_height, maze_size cell_width, maze_size cell_height, std::ofstream& output_log);
+    std::size_t last = -1;
 
-int main(int argc, char* argv[]) {
-	maze_size cell_width, cell_height;
-	maze_size maze_width, maze_height;
-	std::string name;
-	std::ofstream output_log;
-	bool replace;
+    for (;;)
+    {
+        std::size_t i = 0;
+        for (auto p : progress)
+            i += p;
 
-	handle_args(argc, argv, cell_width, cell_height, maze_width, maze_height, replace, name, output_log);
+        if (i != last)
+        {
+            progress_bar(static_cast<double>(i) / total);
+            last = i;
+        }
 
-	maze m = generate_maze(maze_width, maze_height, output_log);
+        if (i == total)
+            return;
 
-	try {
-		generate_image(m, name, maze_width, maze_height, cell_width, cell_height, output_log);
-	}
-	catch (const std::exception& ex) {
-		std::cout << "Failed to generate image: " << ex.what() << "\n";
-	}
-
-	return 0;
+        std::this_thread::sleep_for(100ms);
+    }
 }
 
-void version_name(std::string& name) {
-	std::ifstream t(name);
-	if (t.is_open()) {
-		int version = 0;
-		std::string attempt;
-		do {
-			attempt = name;
-			attempt.insert(name.find('.'), " (" + std::to_string(version) + ')');
-			t.close();
-			t.open(attempt);
-			++version;
-		} while (t.is_open());
-		name = attempt;
-	}
+void draw_task(std::size_t &progress, const maze &mz, image &img, maze::len_t y, maze::len_t num_rows, uint64_t cell_width, uint64_t cell_height, uint64_t wall_width, uint16_t *wall_color, uint16_t *cell_color)
+{
+    uint64_t total_width = cell_width + 2 * wall_width;
+    uint64_t total_height = cell_height + 2 * wall_width;
+
+    maze::len_t end = y + num_rows;
+    if (end > mz.height())
+        end = mz.height();
+    for (; y < end; ++y)
+    {
+        auto image_y = (cell_height + wall_width) * y;
+
+        for (maze::len_t x = 0; x < mz.width(); ++x)
+        {
+            auto image_x = (cell_width + wall_width) * x;
+
+            // draw bottom wall
+            if (!mz.is_wall_open(x, y, maze::direction::down))
+                draw_horiz_line(img, image_x, image_y, total_width, wall_width, wall_color);
+
+            // draw left wall
+            if (!mz.is_wall_open(x, y, maze::direction::left))
+                draw_vert_line(img, image_x, image_y, total_height, wall_width, wall_color);
+
+            ++progress;
+        }
+    }
 }
 
-void handle_args(int argc, char* argv[], maze_size& cell_width, maze_size& cell_height, maze_size& maze_width, maze_size& maze_height, bool& replace, std::string& name, std::ofstream& output_log) {
-	if (argc <= 1) {
-		std::cout << "No options given. Use --help for usage.\n";
-		std::exit(0);
-	}
+void draw_image(const maze &mz, image &img, uint64_t cell_width, uint64_t cell_height, uint64_t wall_width, uint16_t *wall_color, uint16_t *cell_color)
+{
+    std::vector<std::thread> threads;
 
-	std::vector<std::string> args(argv + 1, argv + argc);
+    constexpr maze::len_t max_threads = 500;
+    constexpr maze::len_t max_threads_target_width = 100000;
+    constexpr maze::len_t max_threads_factor = max_threads_target_width / max_threads;
+    maze::len_t num_threads = (mz.width() + max_threads_factor - 1) / max_threads_factor;
+    if (num_threads > max_threads)
+        num_threads = max_threads;
 
-	if (auto loc = std::find(std::begin(args), std::end(args), "--help"); loc != std::end(args)) {
-		std::cout << "Usage: mkmz [options]\n";
-		std::cout << "Options:\n";
-		std::cout << "--help                   Display this information.\n";
-		std::cout << "--log                    Create log of the output.\n";
-		std::cout << "--replace                Replace any file with the same name.\n";
-		std::cout << "-o <FileName>            Specify name of output file.\n";
-		std::cout << "-width <MazeWidth>       Specify width of maze in cells.\n";
-		std::cout << "-height <MazeHeight>     Specify height of maze in cells.\n";
-		std::cout << "-cwidth <CellWidth>      Specify width of cells in pixels.\n";
-		std::cout << "-cheight <CellHeight>    Specify height of cells in pixels.\n";
-		std::cout << "Explanation:\n";
-		std::cout << "	The default value for width, height, cell width, and cell height is 10.\n";
-		std::cout << "	If --log is passed, then an log.txt will appear with the consoles output.\n";
-		std::cout << "	If width is given but not height, height is the same as width. If height is given but not width, width is the same as height.\n";
-		std::cout << "	If cell width is given but not cell height, cell height is the same as cell width. If cell height is given but not cell width, cell width is the same as cell height.\n";
-		std::cout << "Examples:\n";
-		std::cout << "	mkmz -width 20 -height 10 -cwidth 5 -cheight 5 -o mzimg\n";
-		std::cout << "	mkmz -width 20 -cwidth 5\n";
-		std::cout << "	mkmz -width 20\n";
-		std::cout << "	mkmz 20 30 5 5\n";
-		std::cout << "		^^20x20 maze with cell width 5 and cell height 5\n";
-		std::exit(0);
-	}
+    auto mz_division_height = mz.height() / num_threads;
 
-	maze_size counter = 0;
-	for (maze_size i = 0; i < args.size(); ++i) {
-		if (!args[i].empty() && args[i].find_first_not_of("0123456789") == std::string::npos &&
-			(!i || (args[i - 1] != "-width" && args[i - 1] != "-height" && args[i - 1] != "-cwidth" && args[i - 1] != "-cheight" && args[i - 1] != "-o")))
-		{
-			switch (counter) {
-			case 0:
-				args.insert(args.begin() + i, "-width");
-				break;
-			case 1:
-				args.insert(args.begin() + i, "-height");
-				break;
-			case 2:
-				args.insert(args.begin() + i, "-cwidth");
-				break;
-			case 3:
-				args.insert(args.begin() + i, "-cheight");
-				break;
-			default:
-				std::cout << "Ignoring " << counter << "th argument...\n";
-			}
-			++counter;
-			++i;
-		}
-	}
+    std::cout << "Using " << num_threads << " threads.\n";
 
-	cell_width = 0;
-	cell_height = 0;
+    threads.reserve(num_threads);
 
-	if (auto loc = std::find(args.begin(), args.end(), "-cwidth"); loc < std::prev(args.end())) {
-		cell_width = std::stoi(*std::next(loc));
-	}
+    std::vector<std::size_t> progress(num_threads + 2, 0);
+    std::size_t progress_total = num_threads * 2 + 2 + mz.height() * mz.width() + 3;
+    std::size_t &progress_singles = progress[num_threads];
 
-	if (auto loc = std::find(args.begin(), args.end(), "-cheight"); loc < std::prev(args.end())) {
-		cell_height = std::stoi(*std::next(loc));
-	}
+    std::thread progress_thread(progress_task, std::ref(progress), progress_total);
 
-	if (cell_width < 2) cell_width = cell_height;
-	if (cell_height < 2) cell_height = cell_width;
+    {
+        auto division_height = img.height() / num_threads;
 
-	if (cell_width < 1) cell_width = cell_height = 10;
-	if (cell_width == 1) cell_width = cell_height = 2;
+        // clear maze to cell color
+        maze::len_t y = 0;
+        for (maze::len_t t = 0; t < num_threads; ++t)
+        {
+            threads.push_back(std::thread(draw_horiz_line, std::ref(img), 0, y, img.width() - wall_width, division_height, cell_color));
+            y += division_height;
+        }
 
-	maze_width = 0;
-	maze_height = 0;
+        draw_horiz_line(img, 0, y, img.width(), img.height() - y, cell_color);
+        ++progress_singles;
 
-	if (auto loc = std::find(args.begin(), args.end(), "-width"); loc < std::prev(args.end())) {
-		maze_width = std::stoi(*std::next(loc));
-	}
+        for (std::size_t t = 0; t < num_threads; ++t)
+        {
+            threads[t].join();
+            ++progress_singles;
+        }
 
-	if (auto loc = std::find(args.begin(), args.end(), "-height"); loc < std::prev(args.end())) {
-		maze_height = std::stoi(*std::next(loc));
-	}
+        threads.clear();
 
-	if (!maze_width) maze_width = maze_height;
-	if (!maze_height) maze_height = maze_width;
+        // draw right wall
+        y = 0;
+        for (maze::len_t t = 0; t < num_threads; ++t)
+        {
+            threads.push_back(std::thread(draw_horiz_line, std::ref(img), img.width() - wall_width, y, wall_width, division_height, wall_color));
+            y += division_height;
+        }
 
-	if (!maze_width) maze_width = maze_height = 10;
+        draw_horiz_line(img, 0, y, img.width(), img.height() - y, cell_color);
+        ++progress_singles;
 
-	replace = false;
+        for (std::size_t t = 0; t < num_threads; ++t)
+        {
+            threads[t].join();
+            ++progress_singles;
+        }
 
-	if (std::find(args.begin(), args.end(), "--replace") != args.end()) {
-		replace = true;
-	}
+        threads.clear();
+    }
 
-	if (auto loc = std::find(std::begin(args), std::end(args), "-o"); loc < std::prev(args.end())) {
-		name = *(loc + 1);
-		if (auto ext = name.find("."); ext != std::string::npos)
-			name.erase(name.begin() + ext, name.end());
-	}
-	else {
-		name = std::to_string(maze_width) + 'x' + std::to_string(maze_height) + "_maze";
-	}
+    {
+        maze::len_t y = 0;
+        for (maze::len_t t = 0; t < num_threads; ++t)
+        {
+            threads.push_back(std::thread(draw_task, std::ref(progress[t]), std::ref(mz), std::ref(img), y, mz_division_height, cell_width, cell_height, wall_width, wall_color, cell_color));
+            y += mz_division_height;
+        }
 
-	name += ".png";
-	if (!replace) version_name(name);
+        draw_task(progress[num_threads + 1], mz, img, y, mz.height() - y, cell_width, cell_height, wall_width, wall_color, cell_color);
 
-	if (auto loc = std::find(args.begin(), args.end(), "--log"); loc != args.end()) {
-		std::string log_name = name + ".txt";
-		if (!replace) version_name(log_name);
-		output_log.open(log_name, std::ofstream::out | std::ofstream::trunc);
-	}
+        for (std::size_t t = 0; t < num_threads; ++t)
+            threads[t].join();
+    }
+
+    // draw bottom line
+    draw_horiz_line(img, 0, img.height() - wall_width, img.width(), wall_width, wall_color);
+    ++progress_singles;
+
+    {
+        auto image_y = (cell_height + wall_width) * mz.entrance_pt_y() + wall_width;
+
+        if (mz.entrance_pt_x() == 0)
+            draw_vert_line(img, 0, image_y, cell_height, wall_width, cell_color);
+        else
+            draw_vert_line(img, (cell_width + wall_width) * mz.entrance_pt_x() + cell_width + wall_width, image_y, cell_height, wall_width, cell_color);
+        
+        ++progress_singles;
+    }
+
+    {
+        auto image_y = (cell_height + wall_width) * mz.exit_pt_y() + wall_width;
+
+        if (mz.exit_pt_x() == 0)
+            draw_vert_line(img, 0, image_y, cell_height, wall_width, cell_color);
+        else
+            draw_vert_line(img, (cell_width + wall_width) * mz.exit_pt_x() + cell_width + wall_width, image_y, cell_height, wall_width, cell_color);
+
+        ++progress_singles;
+    }
+
+    progress_thread.join();
 }
 
-void display_progress(const double& progress) {
-	static int length = 20;
-	int cur = 1;
-	std::string nulls(length, '-');
-	std::cout << std::fixed << progress * 100 << "% [" + nulls + "]" << std::flush;
-	while (progress < 1) {
-		if (progress * length >= cur) {
-			nulls[cur - 1] = '*';
-			++cur;
-		}
-		std::cout << "\r" << std::fixed << progress * 100 <<  "% [" + nulls + "]" << std::flush;
-	}
-	nulls = std::string(length, '*');
-	std::cout << "\r" << std::fixed << 100.0 << "% [" + nulls + "]" << std::endl;
-}
+#include <regex>
 
-maze generate_maze(maze_size width, maze_size height, std::ofstream& output_log) {
-	maze m;
+void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint64_t &seed)
+{
+    // ./mkmz -dims={10, 10} -cdims={5, 5} -ww=2 -wcol={0, 0, 0, 255} -ccol={255, 255, 255, 255} -o name.png
 
-	std::cout << "Allocating maze...\n";
-	output_log << "Allocating maze...\n";
-	try {
-		m.resize(width, height);
-	}
-	catch (std::bad_alloc) {
-		std::cout << "Maze size is too large. Cannot allocate maze. Aborting...";
-		output_log << "Maze size is too large. Cannot allocate maze. Aborting...";
-		std::exit(-1);
-	}
+    if (argc == 1)
+    {
+        std::cout << "usage: ./mkmz -dims=[MAZE WIDTH], [MAZE HEIGHT] -cdims=[CELL WIDTH], [CELL_HEIGHT] -ww=[WALL WIDTH] -wcol=[R], [G], [B], [A] -ccol=[R], [G], [B], [A] -o [MAZE NAME].png -s=[SEED]\n";
+        std::exit(0);
+    }
 
-	std::cout << "Generating maze...\n";
-	output_log << "Generating maze...\n";
+    std::string line;
+    for (int i = 1; i < argc; ++i)
+        line += argv[i];
 
-	double progress = 0;
-	std::thread progress_counter{ display_progress, std::ref(progress) };
+    std::regex dims_pattern("-dims=(\\d+),(\\d+)");
+    std::regex cdims_pattern("-cdims=(\\d+),(\\d+)");
+    std::regex ww_pattern("-ww=(\\d+)");
+    std::regex wcol_pattern("-wcol=(\\d+)(?:,(\\d+))?(?:,(\\d+))?(?:,(\\d+))?");
+    std::regex ccol_pattern("-ccol=(\\d+)(?:,(\\d+))?(?:,(\\d+))?(?:,(\\d+))?");
+    std::regex o_pattern("-o(\\S+)");
+    std::regex s_pattern("-s=(\\d+)");
 
-	//generate maze
-	auto before = std::chrono::high_resolution_clock::now();
+    std::smatch match;
+    if (std::regex_search(line, match, dims_pattern))
+    {
+        maze_width = std::stoul(match[1].str());
+        maze_height = std::stoul(match[2].str());
+    }
+    else
+    {
+        std::cout << "Dimensions missing or incorrectly formatted\n";
+        std::exit(0);
+    }
 
-	try {
-		m.generate(progress);
-	}
-	catch (const std::exception& ex) {
-		std::cout << "Failed to generate maze: " << ex.what() << "\n";
-		std::exit(-1);
-	}
+    if (std::regex_search(line, match, cdims_pattern))
+    {
+        cell_width = std::stoul(match[1].str());
+        cell_height = std::stoul(match[2].str());
+    }
+    else
+        cell_width = cell_height = 1;
 
-	auto time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - before).count();
+    if (std::regex_search(line, match, ww_pattern))
+        wall_width = std::stoul(match[1].str());
+    else
+        wall_width = 1;
 
-	progress_counter.join();
+    if (std::regex_search(line, match, wcol_pattern))
+    {
+        wall_color[0] = std::stoul(match[1].str());
+        if (match[2].matched)
+            wall_color[1] = std::stoul(match[2].str());
+        else
+            wall_color[1] = 0;
+        if (match[3].matched)
+            wall_color[2] = std::stoul(match[3].str());
+        else
+            wall_color[2] = 0;
+        if (match[4].matched)
+            wall_color[3] = std::stoul(match[4].str());
+        else
+            wall_color[3] = 255;
+    }
+    else
+    {
+        wall_color[0] = wall_color[1] = wall_color[2] = 0;
+        wall_color[3] = 255;
+    }
 
-	std::cout << "Maze generation finished in " << time << "ms (" << time / 1000.0 << "s)\n";
-	output_log << "Maze generation finished in " << time << "ms (" << time / 1000.0 << "s)\n";
+    if (std::regex_search(line, match, ccol_pattern))
+    {
+        cell_color[0] = std::stoul(match[1].str());
+        if (match[2].matched)
+            cell_color[1] = std::stoul(match[2].str());
+        else
+            cell_color[1] = 0;
+        if (match[3].matched)
+            cell_color[2] = std::stoul(match[3].str());
+        else
+            cell_color[2] = 0;
+        if (match[4].matched)
+            cell_color[3] = std::stoul(match[4].str());
+        else
+            cell_color[3] = 255;
+    }
+    else
+        cell_color[0] = cell_color[1] = cell_color[2] = cell_color[3] = 255;
 
-	return m;
-}
+    if (std::regex_search(line, match, o_pattern))
+        name = match[1].str();
+    else
+        name = std::to_string(maze_width) + 'x' + std::to_string(maze_height) + "_maze.png";
+    
+    if (std::regex_search(line, match, s_pattern))
+        seed = std::stoull(match[1].str());
+    else
+        seed = -1;
 
-template<bool col>
-void draw_horiz_line(png_byte* buffer, maze_size x, maze_size len) {
-	for (maze_size i = 0; i < len; ++i) {
-		if constexpr (col) buffer[(x + i) / 8] |= 1 << (7 - (x + i) % 8);
-		else buffer[(x + i) / 8] &= ~(1 << (7 - (x + i) % 8));
-	}
-}
-template<bool col>
-void draw_vert_line(png_byte** buffer, maze_size x, maze_size y, maze_size len) {
-	for (maze_size i = 0; i < len; ++i) {
-		if constexpr (col) buffer[y + i][x / 8] |= 1 << (7 - x % 8);
-		else buffer[y + i][x / 8] &= ~(1 << (7 - x % 8));
-	}
-}
+    // version file if necessary
+    std::ifstream file(name);
+    int iteration = 0;
+    if (file.is_open())
+    {
+        std::string pot;
+        do
+        {
+            auto dot = name.find_last_of('.');
+            pot = name.substr(0, dot);
+            pot += " (";
+            pot += std::to_string(iteration);
+            pot += ')';
+            if (dot != std::string::npos)
+                pot += name.substr(dot);
 
-void generate_image(const maze& m, const std::string& name, maze_size maze_width, maze_size maze_height, maze_size cell_width, maze_size cell_height, std::ofstream& output_log) {
-	std::cout << "Generating image...\n";
-	output_log << "Generating image...\n";
+            file.close();
+            file.open(pot);
 
-	maze_size image_width = maze_width * cell_width + 1;
-	maze_size image_height = maze_height * cell_height + 1;
-
-	maze_size row_width = static_cast<maze_size>(std::ceil(image_width / 8.0));
-
-	double progress = 0;
-	double inc = 1.0 / (maze_width * maze_height);
-	std::thread progress_counter{ display_progress, std::ref(progress) };
-
-	auto before = std::chrono::high_resolution_clock::now();
-
-	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-	png_infop info = png_create_info_struct(png);
-
-	png_set_IHDR(png, info, static_cast<png_uint_32>(image_width), static_cast<png_uint_32>(image_height), 1, PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-
-	FILE* f = fopen(name.c_str(), "wb");
-
-	png_init_io(png, f);
-
-	png_write_info(png, info);
-
-	png_byte** buffer = new png_byte* [cell_height];
-	for (size_t i = 0; i < cell_height; ++i)
-		buffer[i] = new png_byte[row_width];
-
-	maze_size px_x;
-	for (maze_size y = 0; y < maze_height; ++y) {
-		for(size_t i = 0; i < cell_height; ++i)
-			std::fill(buffer[i], buffer[i] + row_width, 0b1111'1111);
-		for (maze_size x = 0; x < maze_width; ++x) {
-			//(px_x, 0) is the bottom left corner of the maze cell in image coords
-			px_x = x * cell_width;
-
-			//(0)0123
-			//(1)0123
-			//(2)0123
-			//(3)0123
-
-			if (!m.opens_at(x, y, dir::down))
-				draw_horiz_line<0>(buffer[0], px_x, cell_width + 1);
-
-			if (!m.opens_at(x, y, dir::left))
-				draw_vert_line<0>(buffer, px_x, 0, cell_height);
-
-			if (!x && !y)
-				draw_horiz_line<1>(buffer[0], 1, cell_width - 1);
-
-			//draw exit
-			if (m.exit_x_coord() == x && m.exit_y_coord() == y && y == 0)
-				draw_horiz_line<1>(buffer[0], m.exit_x_coord() * cell_width + 1, cell_width - 1);
-
-			progress += inc;
-		}
-		draw_vert_line<0>(buffer, image_width - 1, 0, cell_height);
-		png_write_rows(png, buffer, static_cast<png_uint_32>(cell_height));
-	}
-
-	//draw top black line
-	std::fill(buffer[0], buffer[0] + row_width, 0b0000'0000);
-	if (m.exit_y_coord() != 0)
-		draw_horiz_line<1>(buffer[0], m.exit_x_coord() * cell_width + 1, cell_width - 1);
-	png_write_row(png, buffer[0]);
-
-	png_write_end(png, info);
-
-	fclose(f);
-
-	png_destroy_write_struct(&png, &info);
-
-	for (maze_size y = 0; y < cell_height; ++y) {
-		delete[] buffer[y];
-	}
-
-	delete[] buffer;
-
-	progress = 1;
-
-	auto time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - before).count();
-
-	progress_counter.join();
-
-	std::cout << "Image generation finished in " << time << "ms (" << time / 1000.0 << "s)\n";
-	output_log << "Image generation finished in " << time << "ms (" << time / 1000.0 << "s)\n";
-
-	std::cout << "Maze image generated with the following attributes:\n	"
-		<< "Maze Width: " << maze_width << "\n	"
-		<< "Maze Height: " << maze_height << "\n	"
-		<< "Cell Width: " << cell_width << "\n	"
-		<< "Cell Height: " << cell_height << "\n	"
-		<< "Image Width: " << image_width << "\n	"
-		<< "Image Height: " << image_height << "\n	"
-		<< "Image Name: " << name << "\n";
-
-	output_log << "Maze image generated with the following attributes:\n	"
-		<< "Maze Width: " << maze_width << "\n	"
-		<< "Maze Height: " << maze_height << "\n	"
-		<< "Cell Width: " << cell_width << "\n	"
-		<< "Cell Height: " << cell_height << "\n	"
-		<< "Image Width: " << image_width << "\n	"
-		<< "Image Height: " << image_height << "\n	"
-		<< "Image Name: " << name << "\n";
+            ++iteration;
+        } while (file.is_open());
+        name = pot;
+    }
 }

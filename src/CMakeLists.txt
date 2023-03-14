@@ -1,14 +1,15 @@
-﻿cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required(VERSION 3.4)
 
-add_executable (mkmz "main.cpp" "maze.h" )
+file(GLOB_RECURSE SRC CONFIGURE_DEPENDS "*.cpp")
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-
-find_package(PNG REQUIRED)
-find_package(Threads REQUIRED)
+add_executable(mkmz ${SRC})
 
 if(MSVC)
-	target_compile_options(mkmz PRIVATE "/MT")
+	target_compile_options(mkmz PUBLIC $<$<CONFIG:RELEASE>:/O2 /MT> $<$<CONFIG:DEBUG>:/MTd> /W2)
+else()
+	target_compile_options(mkmz PUBLIC $<$<CONFIG:DEBUG>:-g> $<$<CONFIG:RELEASE>:-O3> -Wall)
 endif()
 
-target_link_libraries(mkmz PRIVATE PNG::PNG Threads::Threads)
+find_package(PNG REQUIRED)
+
+target_link_libraries(mkmz PUBLIC PNG::PNG)
