@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/mkmz.dir/image.cpp.o CMakeFiles/mkmz.dir/main.cpp.o CMakeFiles/mkmz.dir/maze.cpp.o -o mkmz  /usr/lib/x86_64-linux-gnu/libpng.so /usr/lib/x86_64-linux-gnu/libz.so 
