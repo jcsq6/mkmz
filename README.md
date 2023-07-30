@@ -62,39 +62,25 @@ This program depends on the following libraries.
 **mkmz [*options*]** 
 
 ***options:***  
-* ```--help```  
-*Display help information*  
-* ```--log```  
-*Create log of program output*  
-* ```--replace```  
-*Replace any file with the same name*  
-* ```-o <FileName>```  
-*Specify name of output file (**Optional**)*  
-* ```-width <MazeWidth>```  
-*Specify width of maze in cells.*  
-* ```-height <MazeHeight>```  
-*Specify height of maze in cells.*  
-* ```-cwidth <CellWidth>```  
-*Specify width of cells in pixels of resulting image.*  
-* ```-cheight <CellHeight>```  
-*Specify height of cells in pixels of resulting image.*  
-
-## Examples  
-* ```mkmz -width 10 -height 15 -cwidth 10 -cheight 10```  
-  *Generates maze with width 10, height 15, cell width 10, and cell height 10. Resulting image name is 10x15_maze.png*  
-* ```mkmz -width 10 -cwidth 5```  
-  *Generates maze with width 10, height 10, cell width 5, and cell height 5. Resulting image name is 10x10_maze.png*  
-* ```mkmz 10 5 2 2```  
-  *Generates maze with width 10, height 5, cell width 2, and cell height 2. Resulting image name is 10x5_maze.png*  
-* ```mkmz 10 10 -o mymaze```  
-  *Generates maze with width 10, height 10, cell width 10, and cell height 10. Resulting image name is mymaze.png*  
+* ```-dims "<MazeWidth>, <MazeHeight>"```  
+*Set the dimensions of the maze (required)*
+* ```-o [FileName]```  
+*Specify name of output file (**Optional**)*
+* ```-cdims "[CELL WIDTH], [CELL_HEIGHT]"```
+*Set the dimensions in pixels of each cell in the maze (defaults to "1,1")*
+* ```-ww [WALL WIDTH]```
+*Set the width of the walls in pixels (defaults to 1)*
+* ```-wcol "[R], [G], [B], [A]"```
+*Set the color of the walls in rgba values ranged 0-255 (Defaults to "0, 0, 0, 255")*
+* ```-ccol "[R], [G], [B], [A]"```
+*Set the color of the cells in rgba values ranged 0-255 (Defaults to "255, 255, 255, 255")*
+* ```-o [MAZE NAME].png```
+*Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)*
+* ```-s [SEED]```
+*Sets the seed of the maze to be generated (Defaults to a random seed)*
 
 # Notes
-* ***The cell width and cell height parameters reflect the distance between walls, not the area between them. So with a cell width of 2 and a cell height of 2, each passagway (or white part of the cell) will be 1 pixel.***  
-* ***You can generate as big a maze as your computer will allow.***  
-* ***The width, height, cell width, and cell height parameters can be ommited and their values can be set, in order***  
-* ***If one parameter is given, and the related parameter is not, the related parameter's value will be the value of the given parameter***  
-
-## Contact
-
-JC Squires - jcsq6inquires@gmail.com
+* ***You can generate as big a maze as your computer will allow.***
+* ***Any R, G, B colors that are ommitted will be set to 0, and any omitted A will be set to 255***
+* ***The maze entrance for the recursive backtracking algorithm will always be (0,0), and the exit will be the farthest point on any wall from (0,0)***
+* ***The maze seed and other relevant info are put into the generated png's text chunks***

@@ -16,8 +16,8 @@ public:
         left = 3,
     };
 
-    inline maze() : m_data{}, m_width{}, m_height{}, entrance_x{}, entrance_y{}, exit_x{}, exit_y{}, m_seed(-1), progress{} {}
-    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, entrance_x{}, entrance_y{}, exit_x{}, exit_y{}, m_seed(-1), progress{}
+    inline maze() : m_data{}, m_width{}, m_height{}, entrance_x{}, entrance_y{}, exit_x{}, exit_y{}, has_seed{}, progress{} {}
+    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, entrance_x{}, entrance_y{}, exit_x{}, exit_y{}, has_seed{}, progress{}
     {
     }
 
@@ -54,12 +54,13 @@ public:
         m_height = height;
     }
 
-    inline void set_seed(unsigned int seed)
+    inline void set_seed(std::uint_least32_t seed)
     {
         m_seed = seed;
+        has_seed = true;
     }
 
-    unsigned int get_seed();
+    std::uint_least32_t get_seed();
 
     void gen_recursive_backtracker();
     // void gen_kruskals();
@@ -79,7 +80,8 @@ private:
     len_t entrance_x, entrance_y;
     len_t exit_x, exit_y;
 
-    len_t m_seed;
+    std::uint_least32_t m_seed;
+    bool has_seed;
 
     std::function<void(double)> progress;
 

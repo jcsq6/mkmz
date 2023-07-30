@@ -105,18 +105,15 @@ void image::write(const std::string &name, const std::vector<std::pair<std::stri
 
     uint64_t i = 0;
 
-    std::thread progress_task;
+    std::jthread progress_task;
     if (callback)
-        progress_task = std::thread(progress_thread_image, callback, std::ref(i), m_height);
+        progress_task = std::jthread(progress_thread_image, callback, std::ref(i), m_height);
     
     for (; i < m_data.size(); ++i)
         png_write_row(l.png_ptr, reinterpret_cast<png_const_bytep>(m_data[i].data()));
 
     png_write_end(l.png_ptr, l.info_ptr);
     fclose(file);
-
-    if (callback)
-        progress_task.join();
 }
 
 #include <mutex>

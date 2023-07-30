@@ -7,7 +7,7 @@
 #include "maze.h"
 #include "image.h"
 
-void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint64_t &seed);
+void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed);
 
 void progress_bar(double progress)
 {
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 
     uint64_t maze_width, maze_height;
 
-    uint64_t seed;
+    uint_least32_t seed;
 
     process_args(argc, argv, image_name, maze_width, maze_height, cell_width, cell_height, wall_width, wall_color, cell_color, seed);
     color_t color_type;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
         auto begin = std::chrono::high_resolution_clock::now();
         maze m(maze_width, maze_height);
 
-        if (seed != static_cast<uint64_t>(-1))
+        if (seed != static_cast<uint_least32_t>(-1))
             m.set_seed(seed);
 
         m.set_progress_callback(progress_bar);
@@ -417,102 +417,282 @@ void draw_image(const maze &mz, image &img, uint64_t cell_width, uint64_t cell_h
 
 #include <regex>
 
-void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint64_t &seed)
+bool try_conversion(const std::string &str, unsigned long long &res)
+{
+    try
+    {
+        res = std::stoull(str);
+        return true;
+    }
+    catch(const std::invalid_argument& e)
+    {
+        return false;
+    }
+}
+
+bool is_valid_filename(const char *name)
+{
+    #ifdef _WIN32
+        char last = '\0';
+        for (; *name; last = *name, ++name)
+            switch (*name)
+            {
+            case '<':
+            case '>':
+            case ':':
+            case '\"':
+            case '/':
+            case '\\':
+            case '|':
+            case '?':
+            case '*':
+                return false;
+            }
+
+            return last != ' ' && last != '.';
+    #elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+        for (; *name; ++name)
+            if (*name == '/')
+                return false;
+        return true;
+    #else
+        return true;
+    #endif
+}
+
+void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed)
 {
     if (argc == 1)
     {
-        std::cout << "usage: ./mkmz -dims=[MAZE WIDTH], [MAZE HEIGHT] -cdims=[CELL WIDTH], [CELL_HEIGHT] -ww=[WALL WIDTH] -wcol=[R], [G], [B], [A] -ccol=[R], [G], [B], [A] -o [MAZE NAME].png -s=[SEED]\n"
-                  << "Any parameters except -dims may be omitted.\n";
+        std::cout << "usage: ./mkmz [options]\n";
+        std::cout << "Options:\n"
+                     "    -dims \"[MAZE WIDTH], [MAZE HEIGHT]\"     Set the dimensions of the maze (required)\n"
+                     "    -cdims \"[CELL WIDTH], [CELL_HEIGHT]\"    Set the dimensions in pixels of each cell in the maze (defaults to \"1,1\")\n"
+                     "    -ww [WALL WIDTH]                          Set the width of the walls in pixels (defaults to 1)\n"
+                     "    -wcol \"[R], [G], [B], [A]\"              Set the color of the walls in rgba values ranged 0-255 (Defaults to \"0, 0, 0, 255\")\n"
+                     "    -ccol \"[R], [G], [B], [A]\"              Set the color of the cells in rgba values ranged 0-255 (Defaults to \"255, 255, 255, 255\")\n"
+                     "    -o [MAZE NAME].png                        Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)\n"
+                     "    -s [SEED]                                 Sets the seed of the maze to be generated (Defaults to a random seed)\n";
         std::exit(0);
     }
 
-    std::string line;
+    std::regex coord("(\\d+)\\s*,\\s*(\\d+)");
+    std::regex color("(\\d+)(?:\\s*,\\s*(\\d+))?(?:\\s*,\\s*(\\d+))?(?:\\s*,\\s*(\\d+))?");
+
+    std::cmatch match;
+
+    bool found_dims = false;
+    bool found_cdims = false;
+    bool found_ww = false;
+    bool found_wcol = false;
+    bool found_ccol = false;
+    bool found_o = false;
+    bool found_s = false;
+
     for (int i = 1; i < argc; ++i)
-        line += argv[i];
-
-    std::regex dims_pattern("-dims=(\\d+),(\\d+)");
-    std::regex cdims_pattern("-cdims=(\\d+),(\\d+)");
-    std::regex ww_pattern("-ww=(\\d+)");
-    std::regex wcol_pattern("-wcol=(\\d+)(?:,(\\d+))?(?:,(\\d+))?(?:,(\\d+))?");
-    std::regex ccol_pattern("-ccol=(\\d+)(?:,(\\d+))?(?:,(\\d+))?(?:,(\\d+))?");
-    std::regex o_pattern("-o(\\S+)");
-    std::regex s_pattern("-s=(\\d+)");
-
-    std::smatch match;
-    if (std::regex_search(line, match, dims_pattern))
     {
-        maze_width = std::stoul(match[1].str());
-        maze_height = std::stoul(match[2].str());
+        if (strcmp(argv[i], "-cdims") == 0)
+        {
+            if (found_cdims)
+            {
+                std::cout << "Ignoring repeat argument -cdims\n";
+                continue;
+            }
+
+            if (i + 1 == argc || !std::regex_search(argv[i + 1], match, coord))
+            {
+                std::cout << "Value for -cdims missing or incorrectly formatted, ignoring...\n";
+                continue;
+            }
+
+            ++i;
+
+            cell_width = std::stoull(match[1].str());
+            cell_height = std::stoull(match[2].str());
+
+            found_cdims = true;
+        }
+        else if (strcmp(argv[i], "-dims") == 0)
+        {
+            if (found_dims)
+            {
+                std::cout << "Ignoring repeat argument -dims\n";
+                continue;
+            }
+
+            if (i + 1 == argc || !std::regex_search(argv[i + 1], match, coord))
+            {
+                std::cout << "Value for -dims missing or incorrectly formatted, ignoring...\n";
+                continue;
+            }
+
+            ++i;
+
+            maze_width = std::stoull(match[1].str());
+            maze_height = std::stoull(match[2].str());
+
+            found_dims = true;
+        }
+        else if (strcmp(argv[i], "-wcol") == 0)
+        {
+            if (found_wcol)
+            {
+                std::cout << "Ignoring repeat argument -wcol\n";
+                continue;
+            }
+
+            if (i + 1 == argc || !std::regex_search(argv[i + 1], match, color))
+            {
+                std::cout << "Value for -wcol missing or incorrectly formatted, ignoring...\n";
+                continue;
+            }
+
+            ++i;
+
+            wall_color[0] = std::stoull(match[1].str());
+            if (match[2].matched)
+                wall_color[1] = std::stoull(match[2].str());
+            else
+                wall_color[1] = 0;
+            
+            if (match[3].matched)
+                wall_color[2] = std::stoull(match[3].str());
+            else
+                wall_color[2] = 0;
+            
+            if (match[4].matched)
+                wall_color[3] = std::stoull(match[4].str());
+            else
+                wall_color[3] = 255;
+
+            found_wcol = true;
+        }
+        else if (strcmp(argv[i], "-ccol") == 0)
+        {
+            if (found_ccol)
+            {
+                std::cout << "Ignoring repeat argument -ccol\n";
+                continue;
+            }
+
+            if (i + 1 == argc || !std::regex_search(argv[i + 1], match, color))
+            {
+                std::cout << "Value for -ccol missing or incorrectly formatted, ignoring...\n";
+                continue;
+            }
+
+            ++i;
+
+            cell_color[0] = std::stoull(match[1].str());
+            if (match[2].matched)
+                cell_color[1] = std::stoull(match[2].str());
+            else
+                cell_color[1] = 0;
+            if (match[3].matched)
+                cell_color[2] = std::stoull(match[3].str());
+            else
+                cell_color[2] = 0;
+            if (match[4].matched)
+                cell_color[3] = std::stoull(match[4].str());
+            else
+                cell_color[3] = 255;
+
+            found_ccol = true;
+        }
+        else if (strcmp(argv[i], "-ww") == 0)
+        {
+            if (found_ww)
+            {
+                std::cout << "Ignoring repeat argument -ww\n";
+                continue;
+            }
+
+            unsigned long long res;
+
+            if (i + 1 == argc || !try_conversion(argv[i + 1], res))
+            {
+                std::cout << "Value for -ww missing or incorrectly formatted, ignoring...\n";
+                continue;
+            }
+
+            ++i;
+
+            wall_width = res;
+
+            found_ww = true;
+        }
+        else if (strcmp(argv[i], "-s") == 0)
+        {
+            if (found_s)
+            {
+                std::cout << "Ignoring repeat argument -s\n";
+                continue;
+            }
+
+            unsigned long long res;
+            if (i + 1 == argc || !try_conversion(argv[i + 1], res))
+            {
+                std::cout << "Value for -s missing or incorrectly formatted, ignoring...\n";
+                continue;
+            }
+
+            ++i;
+
+            seed = res;
+
+            found_s = true;
+        }
+        else if (strcmp(argv[i], "-o") == 0)
+        {
+            if (found_o)
+            {
+                std::cout << "Ignoring repeat argument -o\n";
+                continue;
+            }
+
+            if (i + 1 == argc)
+            {
+                std::cout << "Value for -o missing, ignoring...\n";
+                continue;
+            }
+
+            if (!is_valid_filename(argv[i + 1]))
+                continue;
+
+            ++i;
+
+            name = argv[i];
+
+            found_o = true;
+        }
     }
-    else
+
+    if (!found_dims)
     {
-        std::cout << "Dimensions missing or incorrectly formatted\n";
+        std::cout << "Must provide dimensions of maze via the -dims option.\n";
         std::exit(0);
     }
 
-    if (std::regex_search(line, match, cdims_pattern))
-    {
-        cell_width = std::stoul(match[1].str());
-        cell_height = std::stoul(match[2].str());
-    }
-    else
+    if (!found_cdims)
         cell_width = cell_height = 1;
 
-    if (std::regex_search(line, match, ww_pattern))
-        wall_width = std::stoul(match[1].str());
-    else
+    if (!found_ww)
         wall_width = 1;
 
-    if (std::regex_search(line, match, wcol_pattern))
-    {
-        wall_color[0] = std::stoul(match[1].str());
-        if (match[2].matched)
-            wall_color[1] = std::stoul(match[2].str());
-        else
-            wall_color[1] = 0;
-        if (match[3].matched)
-            wall_color[2] = std::stoul(match[3].str());
-        else
-            wall_color[2] = 0;
-        if (match[4].matched)
-            wall_color[3] = std::stoul(match[4].str());
-        else
-            wall_color[3] = 255;
-    }
-    else
+    if (!found_ccol)
+        cell_color[0] = cell_color[1] = cell_color[2] = cell_color[3] = 255;
+
+    if (!found_o)
+        name = std::to_string(maze_width) + 'x' + std::to_string(maze_height) + "_maze.png";
+
+    if (!found_s)
+        seed = static_cast<uint_least32_t>(-1);
+
+    if (!found_wcol)
     {
         wall_color[0] = wall_color[1] = wall_color[2] = 0;
         wall_color[3] = 255;
     }
-
-    if (std::regex_search(line, match, ccol_pattern))
-    {
-        cell_color[0] = std::stoul(match[1].str());
-        if (match[2].matched)
-            cell_color[1] = std::stoul(match[2].str());
-        else
-            cell_color[1] = 0;
-        if (match[3].matched)
-            cell_color[2] = std::stoul(match[3].str());
-        else
-            cell_color[2] = 0;
-        if (match[4].matched)
-            cell_color[3] = std::stoul(match[4].str());
-        else
-            cell_color[3] = 255;
-    }
-    else
-        cell_color[0] = cell_color[1] = cell_color[2] = cell_color[3] = 255;
-
-    if (std::regex_search(line, match, o_pattern))
-        name = match[1].str();
-    else
-        name = std::to_string(maze_width) + 'x' + std::to_string(maze_height) + "_maze.png";
-
-    if (std::regex_search(line, match, s_pattern))
-        seed = std::stoull(match[1].str());
-    else
-        seed = -1;
 
     // version file if necessary
     std::ifstream file(name);

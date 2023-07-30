@@ -106,10 +106,11 @@ struct connection
 
 unsigned int maze::get_seed()
 {
-	if (m_seed != static_cast<unsigned int>(-1))
-		return static_cast<unsigned int>(m_seed);
+	if (has_seed)
+		return m_seed;
+	has_seed = true;
 	std::random_device rd;
-	return static_cast<unsigned int>(m_seed = rd());
+	return m_seed = rd();
 }
 
 void maze::gen_recursive_backtracker()
@@ -211,22 +212,15 @@ void maze::gen_recursive_backtracker()
 		if (p.x == 0 || p.y == 0 || p.x == m_width - 1 || p.y == m_height - 1)
 		{
 			auto &end_pt = entrance.end.find(p)->second;
-			if (!end_pt.finished)
-			{
-				end_pt.final_distance = distance;
-				end_pt.finished = true;
-			}
+			end_pt.final_distance = distance;
+			end_pt.finished = true;
 		}
 	} while (cur_top != total);
 
 	auto max = entrance.end.begin();
 	for (auto it = entrance.end.begin(); it != entrance.end.end(); ++it)
-	{
-		if (!it->second.finished)
-			throw std::runtime_error("I was wrong, it doesn't reach every point forwards...");
 		if (it->second.final_distance > max->second.final_distance)
 			max = it;
-	}
 
 	entrance_x = entrance_y = 0;
 	exit_x = max->first.x;
