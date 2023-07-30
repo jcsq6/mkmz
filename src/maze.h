@@ -27,14 +27,14 @@ public:
     maze(maze &&) = default;
     maze &operator=(maze &&) = default;
 
-    len_t width() const { return m_width; }
-    len_t height() const { return m_height; }
+    inline len_t width() const { return m_width; }
+    inline len_t height() const { return m_height; }
 
-    len_t entrance_pt_x() const { return entrance_x; }
-    len_t entrance_pt_y() const { return entrance_y; }
+    inline len_t entrance_pt_x() const { return entrance_x; }
+    inline len_t entrance_pt_y() const { return entrance_y; }
 
-    len_t exit_pt_x() const { return exit_x; }
-    len_t exit_pt_y() const { return exit_y; }
+    inline len_t exit_pt_x() const { return exit_x; }
+    inline len_t exit_pt_y() const { return exit_y; }
 
     // fun is a function who takes a double between 0 and 1 representing progress
     inline void set_progress_callback(std::function<void(double)> fun) { progress = std::move(fun); }
@@ -54,7 +54,7 @@ public:
         m_height = height;
     }
 
-    void set_seed(unsigned int seed)
+    inline void set_seed(unsigned int seed)
     {
         m_seed = seed;
     }
@@ -85,8 +85,6 @@ private:
 
     void set_wall(len_t x, len_t y, direction dir, state s);
     state get_wall(len_t x, len_t y, direction dir) const;
-
-    void find_exits(len_t &count);
 
     inline void alloc()
     {

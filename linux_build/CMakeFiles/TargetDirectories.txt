@@ -1,5 +1,0 @@
-/home/jcsq6/Dropbox/c++Dev/mkmz/linux_build/CMakeFiles/edit_cache.dir
-/home/jcsq6/Dropbox/c++Dev/mkmz/linux_build/CMakeFiles/rebuild_cache.dir
-/home/jcsq6/Dropbox/c++Dev/mkmz/linux_build/src/CMakeFiles/mkmz.dir
-/home/jcsq6/Dropbox/c++Dev/mkmz/linux_build/src/CMakeFiles/edit_cache.dir
-/home/jcsq6/Dropbox/c++Dev/mkmz/linux_build/src/CMakeFiles/rebuild_cache.dir
