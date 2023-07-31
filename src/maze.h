@@ -63,7 +63,7 @@ public:
     std::uint_least32_t get_seed();
 
     void gen_recursive_backtracker();
-    // void gen_kruskals();
+    void gen_wilsons();
 
 private:
     enum class state : bool
@@ -84,6 +84,8 @@ private:
     bool has_seed;
 
     std::function<void(double)> progress;
+
+    void find_exits(len_t &count);
 
     void set_wall(len_t x, len_t y, direction dir, state s);
     state get_wall(len_t x, len_t y, direction dir) const;

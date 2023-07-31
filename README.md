@@ -41,6 +41,12 @@ The goal of this program was to be able to generate mazes of any size as large a
 *Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)*  
 * ```-s [SEED]```  
 *Sets the seed of the maze to be generated (Defaults to a random seed)*  
+* ```--rb```
+*Use recursive backtracking algorithm (default)*
+*Recursive backtracking can be used for any size of maze, and is generally very fast*
+* ```--w```
+*Use Wilson's algorithm*  
+*Wilsons' algorithm should only typically be used for small mazes, as it takes exponentially longer the larger the maze*
 
 # Notes
 * ***You can generate as big a maze as your computer will allow.***  

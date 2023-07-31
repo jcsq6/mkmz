@@ -7,7 +7,13 @@
 #include "maze.h"
 #include "image.h"
 
-void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed);
+enum class algorithm_type
+{
+    recursive_backtracker,
+    wilsons,
+};
+
+void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed, algorithm_type &algorithm);
 
 void progress_bar(double progress)
 {
@@ -53,7 +59,9 @@ int main(int argc, char *argv[])
 
     uint_least32_t seed;
 
-    process_args(argc, argv, image_name, maze_width, maze_height, cell_width, cell_height, wall_width, wall_color, cell_color, seed);
+    algorithm_type algorithm;
+
+    process_args(argc, argv, image_name, maze_width, maze_height, cell_width, cell_height, wall_width, wall_color, cell_color, seed, algorithm);
     color_t color_type;
     int depth;
     if (is_gray(wall_color) && is_gray(cell_color))
@@ -98,7 +106,10 @@ int main(int argc, char *argv[])
 
         try
         {
-            m.gen_recursive_backtracker();
+            if (algorithm == algorithm_type::recursive_backtracker)
+                m.gen_recursive_backtracker();
+            else if (algorithm == algorithm_type::wilsons)
+                m.gen_wilsons();
         }
         catch (const std::bad_alloc &e)
         {
@@ -145,6 +156,16 @@ int main(int argc, char *argv[])
         std::cout << "\nImage drawing finished in " << std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - begin).count() << "s\n";
     }
 
+    const char *algorithm_name;
+    switch (algorithm)
+    {
+    case algorithm_type::recursive_backtracker:
+        algorithm_name = "Recursive Backtracker";
+        break;
+    case algorithm_type::wilsons:
+        algorithm_name = "Wilson's Algorithm";
+    }
+
     std::cout << "Writing image...\n";
     auto begin = std::chrono::high_resolution_clock::now();
     try
@@ -157,6 +178,7 @@ int main(int argc, char *argv[])
             std::pair<std::string, std::string>{"Wall Width", std::to_string(wall_width)},
             std::pair<std::string, std::string>{"Maze Entrance", get_coords(entrance_x, entrance_y)},
             std::pair<std::string, std::string>{"Maze Exit", get_coords(exit_x, exit_y)},
+            std::pair<std::string, std::string>{"Maze Generation Algorithm", algorithm_name},
         };
         res.write(image_name, chunks, 5, progress_bar);
     }
@@ -179,6 +201,7 @@ int main(int argc, char *argv[])
     std::cout << "\tMaze dimensions: (" << maze_width << ", " << maze_height << ")\n";
     std::cout << "\tMaze entrance: (" << entrance_x << ", " << entrance_y << ")\n";
     std::cout << "\tMaze exit: (" << exit_x << ", " << exit_y << ")\n";
+    std::cout << "\tMaze Generation Algorithm: " << algorithm_name << '\n';
     std::cout << "\tMaze seed: " << seed << '\n';
     std::cout << "\tImage name: " << image_name << '\n';
     std::cout << "\tImage size: " << d << "BKMGTPE"[i];
@@ -460,7 +483,7 @@ bool is_valid_filename(const char *name)
     #endif
 }
 
-void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed)
+void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed, algorithm_type &algorithm)
 {
     if (argc == 1)
     {
@@ -472,7 +495,9 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
                      "    -wcol \"[R], [G], [B], [A]\"              Set the color of the walls in rgba values ranged 0-255 (Defaults to \"0, 0, 0, 255\")\n"
                      "    -ccol \"[R], [G], [B], [A]\"              Set the color of the cells in rgba values ranged 0-255 (Defaults to \"255, 255, 255, 255\")\n"
                      "    -o [MAZE NAME].png                        Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)\n"
-                     "    -s [SEED]                                 Sets the seed of the maze to be generated (Defaults to a random seed)\n";
+                     "    -s [SEED]                                 Sets the seed of the maze to be generated (Defaults to a random seed)\n"
+                     "    --rb                                      Use recursive backtracking algorithm (default)\n"
+                     "    --w                                       Use Wilson's algorithm\n";
         std::exit(0);
     }
 
@@ -488,6 +513,9 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
     bool found_ccol = false;
     bool found_o = false;
     bool found_s = false;
+
+    bool found_rb = false;
+    bool found_w = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -665,6 +693,24 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
 
             found_o = true;
         }
+        else if (strcmp(argv[i], "--rb") == 0)
+        {
+            if (found_w)
+            {
+                std::cout << "Ignoring second algorithm type...\n";
+                continue;
+            }
+            found_rb = true;
+        }
+        else if (strcmp(argv[i], "--w") == 0)
+        {
+            if (found_rb)
+            {
+                std::cout << "Ignoring second algorithm type...\n";
+                continue;
+            }
+            found_w = true;
+        }
     }
 
     if (!found_dims)
@@ -693,6 +739,13 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
         wall_color[0] = wall_color[1] = wall_color[2] = 0;
         wall_color[3] = 255;
     }
+
+    if (found_rb)
+        algorithm = algorithm_type::recursive_backtracker;
+    else if (found_w)
+        algorithm = algorithm_type::wilsons;
+    else
+        algorithm = algorithm_type::recursive_backtracker;
 
     // version file if necessary
     std::ifstream file(name);

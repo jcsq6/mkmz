@@ -1,9 +1,12 @@
 #include "maze.h"
+
 #include <random>
+
 #include <thread>
 #include <chrono>
-#include <algorithm>
+
 #include <unordered_map>
+#include <unordered_set>
 
 #include <iostream>
 
@@ -104,6 +107,69 @@ struct connection
 	std::unordered_map<pt, end_pt, pt_hash> end;
 };
 
+void maze::find_exits(len_t &count)
+{
+	len_t total = m_width * m_height;
+	// find exits
+	connection entrance(m_width, m_height);
+	// set the first to true
+	entrance.end[{0, 0}].finished = true;
+
+	pt p_init = {0, 0};
+	pt p = p_init;
+
+	std::vector<direction> stack;
+	std::vector<bool> visited(total);
+	visited[0] = true;
+
+	len_t i = 1;
+	++count;
+	maze::len_t distance = 0;
+	do
+	{
+		maze::direction dir;
+		if (p.y < m_height - 1 && !visited[(p.y + 1) * m_width + p.x] && get_wall(p.x, p.y, direction::up) == state::open)
+			dir = maze::direction::up;
+		else if (p.x < m_width - 1 && !visited[p.y * m_width + p.x + 1] && get_wall(p.x, p.y, direction::right) == state::open)
+			dir = maze::direction::right;
+		else if (p.y && !visited[(p.y - 1) * m_width + p.x] && get_wall(p.x, p.y, direction::down) == state::open)
+			dir = maze::direction::down;
+		else if (p.x && !visited[p.y * m_width + p.x - 1] && get_wall(p.x, p.y, direction::left) == state::open)
+			dir = maze::direction::left;
+		else
+		{
+			move(p, opposite(stack.back()));
+			stack.pop_back();
+			--distance;
+
+			continue;
+		}
+
+		move(p, dir);
+		stack.push_back(dir);
+		visited[p.y * m_width + p.x] = true;
+		++count;
+		++i;
+		++distance;
+
+		if (p.x == 0 || p.y == 0 || p.x == m_width - 1 || p.y == m_height - 1)
+		{
+			auto &end_pt = entrance.end.find(p)->second;
+			end_pt.final_distance = distance;
+			end_pt.finished = true;
+		}
+	} while (i < total);
+
+	auto max = entrance.end.begin();
+	for (auto it = entrance.end.begin(); it != entrance.end.end(); ++it)
+		if (it->second.final_distance > max->second.final_distance)
+			max = it;
+
+	entrance_x = entrance_y = 0;
+	exit_x = max->first.x;
+	exit_y = max->first.y;
+}
+
 unsigned int maze::get_seed()
 {
 	if (has_seed)
@@ -118,11 +184,11 @@ void maze::gen_recursive_backtracker()
 	alloc();
 
 	len_t cur_top = 1;
-	len_t total = m_width * m_height * 2;
+	len_t len = m_width * m_height;
 
 	std::jthread progress_task;
 	if (progress)
-		progress_task = std::jthread(progress_thread, progress, std::ref(cur_top), total);
+		progress_task = std::jthread(progress_thread, progress, std::ref(cur_top), len * 2);
 
 	std::mt19937 gen(get_seed());
 
@@ -131,7 +197,7 @@ void maze::gen_recursive_backtracker()
 
 	std::vector<direction> stack;
 	// use bitset to track which is visited
-	std::vector<bool> visited(m_width * m_height, 0);
+	std::vector<bool> visited(len, 0);
 	visited[p.y * m_width + p.x] = true;
 	do
 	{
@@ -168,63 +234,81 @@ void maze::gen_recursive_backtracker()
 		}
 	} while (p != p_init);
 
-	// find exits
-	connection entrance(m_width, m_height);
-	// set the first to true
-	entrance.end[{0, 0}].finished = true;
+	find_exits(cur_top);
+}
 
-	p_init = {0, 0};
-	p = p_init;
+void maze::gen_wilsons()
+{
+	alloc();
 
-	stack.clear();
-	visited.clear();
-	visited.resize(m_width * m_height, false);
-	visited[0] = true;
+	auto len = m_width * m_height;
 
-	++cur_top;
-	maze::len_t distance = 0;
-	do
+	std::unordered_map<pt, bool, pt_hash> grid(len);
+	std::unordered_set<pt, pt_hash> available(len);
+	for (pt p{0, 0}; p.x < m_width; ++p.x)
+		for (p.y = 0; p.y < m_height; ++p.y)
+			available.insert(p);
+
+	std::mt19937 gen(get_seed());
+
+	std::uniform_int_distribution<len_t> x_dist(0, m_width - 1);
+	std::uniform_int_distribution<len_t> y_dist(0, m_height - 1);
+
+	len_t finished = 1;
+	std::jthread progress_task;
+	if (progress)
+		progress_task = std::jthread(progress_thread, progress, std::ref(finished), len * 2);
+	
+	// initial
 	{
-		maze::direction dir;
-		if (p.y < m_height - 1 && !visited[(p.y + 1) * m_width + p.x] && get_wall(p.x, p.y, direction::up) == state::open)
-			dir = maze::direction::up;
-		else if (p.x < m_width - 1 && !visited[p.y * m_width + p.x + 1] && get_wall(p.x, p.y, direction::right) == state::open)
-			dir = maze::direction::right;
-		else if (p.y && !visited[(p.y - 1) * m_width + p.x] && get_wall(p.x, p.y, direction::down) == state::open)
-			dir = maze::direction::down;
-		else if (p.x && !visited[p.y * m_width + p.x - 1] && get_wall(p.x, p.y, direction::left) == state::open)
-			dir = maze::direction::left;
-		else
-		{
-			move(p, opposite(stack.back()));
-			stack.pop_back();
-			--distance;
+		pt first{x_dist(gen), y_dist(gen)};
+		grid[first] = true;
+		available.erase(first);
+	}
 
-			continue;
+	while (finished < len)
+	{
+		// walk
+		// choose random element from available
+		pt p_start = *std::next(available.begin(), std::uniform_int_distribution<std::size_t>(0, available.size() - 1)(gen));
+		pt p = p_start;
+
+		std::unordered_map<pt, direction, pt_hash> walk;
+		while (true)
+		{
+			direction available[4];
+			len_t num_available = 0;
+			if (p.y < m_height - 1)
+				available[num_available++] = direction::up;
+			if (p.x < m_width - 1)
+				available[num_available++] = direction::right;
+			if (p.y)
+				available[num_available++] = direction::down;
+			if (p.x)
+				available[num_available++] = direction::left;
+
+			direction cur_dir = available[std::uniform_int_distribution<len_t>(0, num_available - 1)(gen)];
+			walk[p] = cur_dir;
+
+			if (grid[p])
+				break;
+			
+			move(p, cur_dir);
 		}
 
-		move(p, dir);
-		stack.push_back(dir);
-		visited[p.y * m_width + p.x] = true;
-		++cur_top;
-		++distance;
-
-		if (p.x == 0 || p.y == 0 || p.x == m_width - 1 || p.y == m_height - 1)
+		// retrace walk and open cells
+		do
 		{
-			auto &end_pt = entrance.end.find(p)->second;
-			end_pt.final_distance = distance;
-			end_pt.finished = true;
-		}
-	} while (cur_top != total);
+			grid[p_start] = true;
+			available.erase(p_start);
+			direction cur_dir = walk[p_start];
+			set_wall(p_start.x, p_start.y, cur_dir, state::open);
+			move(p_start, cur_dir);
+			++finished;
+		} while (p_start != p);
+	}
 
-	auto max = entrance.end.begin();
-	for (auto it = entrance.end.begin(); it != entrance.end.end(); ++it)
-		if (it->second.final_distance > max->second.final_distance)
-			max = it;
-
-	entrance_x = entrance_y = 0;
-	exit_x = max->first.x;
-	exit_y = max->first.y;
+	find_exits(finished);
 }
 
 // struct edge
@@ -312,6 +396,7 @@ void maze::gen_recursive_backtracker()
 //     if (progress)
 //         progress_task.join();
 // }
+
 
 void maze::set_wall(len_t x, len_t y, direction dir, state s)
 {
