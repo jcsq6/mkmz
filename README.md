@@ -26,28 +26,27 @@ The goal of this program was to be able to generate mazes of any size as large a
 
 ***options:***  
 * ```-dims "<MazeWidth>, <MazeHeight>"```  
-*Set the dimensions of the maze (required)*
+*Set the dimensions of the maze (required)*  
 * ```-o [FileName]```  
-*Specify name of output file (**Optional**)*
-* ```-cdims "[CELL WIDTH], [CELL_HEIGHT]"```
-*Set the dimensions in pixels of each cell in the maze (defaults to "1,1")*
-* ```-ww [WALL WIDTH]```
-*Set the width of the walls in pixels (defaults to 1)*
-* ```-wcol "[R], [G], [B], [A]"```
-*Set the color of the walls in rgba values ranged 0-255 (Defaults to "0, 0, 0, 255")*
-* ```-ccol "[R], [G], [B], [A]"```
-*Set the color of the cells in rgba values ranged 0-255 (Defaults to "255, 255, 255, 255")*
-* ```-o [MAZE NAME].png```
-*Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)*
-* ```-s [SEED]```
-*Sets the seed of the maze to be generated (Defaults to a random seed)*
+*Specify name of output file (**Optional**)*  
+* ```-cdims "[CELL WIDTH], [CELL_HEIGHT]"```  
+*Set the dimensions in pixels of each cell in the maze (defaults to "1,1")*  
+* ```-ww [WALL WIDTH]```  
+*Set the width of the walls in pixels (defaults to 1)*  
+* ```-wcol "[R], [G], [B], [A]"```  
+*Set the color of the walls in rgba values ranged 0-255 (Defaults to "0, 0, 0, 255")*  
+* ```-ccol "[R], [G], [B], [A]"```  
+*Set the color of the cells in rgba values ranged 0-255 (Defaults to "255, 255, 255, 255")*  
+* ```-o [MAZE NAME].png```  
+*Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)*  
+* ```-s [SEED]```  
+*Sets the seed of the maze to be generated (Defaults to a random seed)*  
 
 # Notes
-* ***You can generate as big a maze as your computer will allow.***
+* ***You can generate as big a maze as your computer will allow.***  
 * ***Any R, G, B colors that are ommitted will be set to 0, and any omitted A will be set to 255***
-* ***The maze entrance for the recursive backtracking algorithm will always be (0,0), and the exit will be the farthest point on any wall from (0,0)***
-* ***The maze seed and other relevant info are put into the generated png's text chunks***
-
+* ***The maze entrance for the recursive backtracking algorithm will always be (0,0), and the exit will be the farthest point on any wall from (0,0)***  
+* ***The maze seed and other relevant info are put into the generated png's text chunks***  
 
 ### Built With
 
@@ -82,5 +81,4 @@ This program depends on the following libraries.
   1. `mkdir build`
   2. `cd build`
   3. `cmake -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static ..`
-  4. `msbuild mkmz.sln` *(From developer command prompt)*  
-      *Alternative: open solution and build from visual studio*
+  4. `cmake --build .`
