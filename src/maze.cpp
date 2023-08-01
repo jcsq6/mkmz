@@ -126,11 +126,19 @@ void maze::find_exits(len_t &count)
 		bool open[4]{};
 		len_t available = 0;
 		for (char d = 0; d < 4; ++d)
-			if (d != last_dir_opp && (open[d] = (get_wall(p, static_cast<direction>(d)) == state::open)))
+			if (open[d] = (d != last_dir_opp && get_wall(p, static_cast<direction>(d)) == state::open))
 				++available;
 
 		direction dir;
-		if (!available)
+		if (p.y < m_height - 1 && !visited[(p.y + 1) * m_width + p.x] && open[static_cast<char>(direction::up)])
+			dir = direction::up;
+		else if (p.x < m_width - 1 && !visited[p.y * m_width + p.x + 1] && open[static_cast<char>(direction::right)])
+			dir = direction::right;
+		else if (p.y && !visited[(p.y - 1) * m_width + p.x] && open[static_cast<char>(direction::down)])
+			dir = direction::down;
+		else if (p.x && !visited[p.y * m_width + p.x - 1] && open[static_cast<char>(direction::left)])
+			dir = direction::left;
+		else
 		{
 			move(p, opposite(stack.back()));
 			last_dir_opp = static_cast<char>(stack.back());
@@ -143,14 +151,6 @@ void maze::find_exits(len_t &count)
 
 			continue;
 		}
-		else if (p.y < m_height - 1 && !visited[(p.y + 1) * m_width + p.x] && open[static_cast<char>(direction::up)])
-			dir = direction::up;
-		else if (p.x < m_width - 1 && !visited[p.y * m_width + p.x + 1] && open[static_cast<char>(direction::right)])
-			dir = direction::right;
-		else if (p.y && !visited[(p.y - 1) * m_width + p.x] && open[static_cast<char>(direction::down)])
-			dir = direction::down;
-		else if (p.x && !visited[p.y * m_width + p.x - 1] && open[static_cast<char>(direction::left)])
-			dir = direction::left;
 		
 
 		if (last_was_forwards && available > 1)
