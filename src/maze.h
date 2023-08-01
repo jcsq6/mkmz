@@ -2,6 +2,14 @@
 #include <vector>
 #include <stdexcept>
 #include <functional>
+#include <random>
+
+struct pt
+{
+	unsigned long long x, y;
+	bool operator==(pt o) const { return x == o.x && y == o.y; }
+	bool operator!=(pt o) const { return x != o.x || y != o.y; }
+};
 
 class maze
 {
@@ -16,8 +24,8 @@ public:
         left = 3,
     };
 
-    inline maze() : m_data{}, m_width{}, m_height{}, entrance_x{}, entrance_y{}, exit_x{}, exit_y{}, has_seed{}, progress{} {}
-    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, entrance_x{}, entrance_y{}, exit_x{}, exit_y{}, has_seed{}, progress{}
+    inline maze() : m_data{}, m_width{}, m_height{}, m_entrance{}, m_exit{}, has_seed{}, progress{} {}
+    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, m_entrance{}, m_exit{}, has_seed{}, progress{}
     {
     }
 
@@ -30,22 +38,19 @@ public:
     inline len_t width() const { return m_width; }
     inline len_t height() const { return m_height; }
 
-    inline len_t entrance_pt_x() const { return entrance_x; }
-    inline len_t entrance_pt_y() const { return entrance_y; }
-
-    inline len_t exit_pt_x() const { return exit_x; }
-    inline len_t exit_pt_y() const { return exit_y; }
+    inline pt entrance() const { return m_entrance; }
+    inline pt exit() const { return m_exit; }
 
     // fun is a function who takes a double between 0 and 1 representing progress
     inline void set_progress_callback(std::function<void(double)> fun) { progress = std::move(fun); }
 
-    inline bool is_wall_open(len_t x, len_t y, direction dir) const
+    inline bool is_wall_open(pt p, direction dir) const
     {
         if (m_data.empty())
             throw std::runtime_error("No maze generated");
-        if (x > m_width || y > m_height)
+        if (p.x > m_width || p.y > m_height)
             throw std::out_of_range("Cell not in range");
-        return get_wall(x, y, dir) == state::open;
+        return get_wall(p, dir) == state::open;
     }
 
     inline void set_dims(len_t width, len_t height)
@@ -64,6 +69,7 @@ public:
 
     void gen_recursive_backtracker();
     void gen_wilsons();
+    void gen_recursive_division();
 
 private:
     enum class state : bool
@@ -77,8 +83,8 @@ private:
     len_t m_width;
     len_t m_height;
 
-    len_t entrance_x, entrance_y;
-    len_t exit_x, exit_y;
+    pt m_entrance;
+    pt m_exit;
 
     std::uint_least32_t m_seed;
     bool has_seed;
@@ -87,12 +93,15 @@ private:
 
     void find_exits(len_t &count);
 
-    void set_wall(len_t x, len_t y, direction dir, state s);
-    state get_wall(len_t x, len_t y, direction dir) const;
+    template <state s>
+    void set_wall(pt p, direction dir);
+    state get_wall(pt p, direction dir) const;
 
-    inline void alloc()
+    inline void alloc(state s)
     {
         m_data.clear();
-        m_data.resize((m_width * m_height + 15) / 16);
+        m_data.resize((m_width * m_height + 15) / 16, s == state::closed ? 0 : std::numeric_limits<std::uint32_t>::max());
     }
+
+    void divide(std::mt19937 &gen, pt p, maze::len_t width, maze::len_t height, bool horizontal_not_vertical, len_t &count);
 };

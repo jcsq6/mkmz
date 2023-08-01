@@ -44,9 +44,16 @@ The goal of this program was to be able to generate mazes of any size as large a
 * ```--rb```  
 *Use recursive backtracking algorithm (default)*  
 *Recursive backtracking can be used for any size of maze, and is generally very fast*  
+*Generates mazes with long corridors*
 * ```--w```  
 *Use Wilson's algorithm*  
 *Wilsons' algorithm should only typically be used for small mazes, as it takes exponentially longer the larger the maze*  
+*Generates mazes along a uniform distribution, leading to a good balance between different corridors*  
+* ```--rd```  
+*Use recursive division algorithm*  
+*Fastest algorithm*  
+*This algorithm is very fast for mazes of any size.*  
+*Generates mazes with many box-like sub-groups*
 
 # Notes
 * ***You can generate as big a maze as your computer will allow.***  

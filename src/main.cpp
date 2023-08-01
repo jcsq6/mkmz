@@ -11,6 +11,7 @@ enum class algorithm_type
 {
     recursive_backtracker,
     wilsons,
+    recursive_division,
 };
 
 void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_width, uint64_t &maze_height, uint64_t &cell_width, uint64_t &cell_height, uint64_t &wall_width, uint16_t *wall_color, uint16_t *cell_color, uint_least32_t &seed, algorithm_type &algorithm);
@@ -91,8 +92,7 @@ int main(int argc, char *argv[])
     }
 
     image res;
-    maze::len_t entrance_x, entrance_y;
-    maze::len_t exit_x, exit_y;
+    pt entrance, exit;
 
     {
         std::cout << "Generating maze...\n";
@@ -110,6 +110,8 @@ int main(int argc, char *argv[])
                 m.gen_recursive_backtracker();
             else if (algorithm == algorithm_type::wilsons)
                 m.gen_wilsons();
+            else if (algorithm == algorithm_type::recursive_division)
+                m.gen_recursive_division();
         }
         catch (const std::bad_alloc &e)
         {
@@ -122,10 +124,8 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        entrance_x = m.entrance_pt_x();
-        entrance_y = m.entrance_pt_y();
-        exit_x = m.exit_pt_x();
-        exit_y = m.exit_pt_y();
+        entrance = m.entrance();
+        exit = m.exit();
 
         seed = m.get_seed();
 
@@ -164,6 +164,10 @@ int main(int argc, char *argv[])
         break;
     case algorithm_type::wilsons:
         algorithm_name = "Wilson's Algorithm";
+        break;
+    case algorithm_type::recursive_division:
+        algorithm_name = "Recursive Division";
+        break;
     }
 
     std::cout << "Writing image...\n";
@@ -176,8 +180,8 @@ int main(int argc, char *argv[])
             std::pair<std::string, std::string>{"Maze Dimensions", get_coords(maze_width, maze_height)},
             std::pair<std::string, std::string>{"Cell Dimensions", get_coords(cell_width, cell_height)},
             std::pair<std::string, std::string>{"Wall Width", std::to_string(wall_width)},
-            std::pair<std::string, std::string>{"Maze Entrance", get_coords(entrance_x, entrance_y)},
-            std::pair<std::string, std::string>{"Maze Exit", get_coords(exit_x, exit_y)},
+            std::pair<std::string, std::string>{"Maze Entrance", get_coords(entrance.x, entrance.y)},
+            std::pair<std::string, std::string>{"Maze Exit", get_coords(exit.x, exit.y)},
             std::pair<std::string, std::string>{"Maze Generation Algorithm", algorithm_name},
         };
         res.write(image_name, chunks, 5, progress_bar);
@@ -199,8 +203,8 @@ int main(int argc, char *argv[])
 
     std::cout << "\nMaze generated with the following properties: \n";
     std::cout << "\tMaze dimensions: (" << maze_width << ", " << maze_height << ")\n";
-    std::cout << "\tMaze entrance: (" << entrance_x << ", " << entrance_y << ")\n";
-    std::cout << "\tMaze exit: (" << exit_x << ", " << exit_y << ")\n";
+    std::cout << "\tMaze entrance: (" << entrance.x << ", " << entrance.y << ")\n";
+    std::cout << "\tMaze exit: (" << exit.x << ", " << exit.y << ")\n";
     std::cout << "\tMaze Generation Algorithm: " << algorithm_name << '\n';
     std::cout << "\tMaze seed: " << seed << '\n';
     std::cout << "\tImage name: " << image_name << '\n';
@@ -287,11 +291,11 @@ void draw_task(std::size_t &progress, const maze &mz, image &img, maze::len_t y,
             auto image_x = (cell_width + wall_width) * x;
 
             // draw bottom wall
-            if (!mz.is_wall_open(x, y, maze::direction::down))
+            if (!mz.is_wall_open({x, y}, maze::direction::down))
                 draw_horiz_line(img, image_x, image_y, total_width, wall_width, wall_color);
 
             // draw left wall
-            if (!mz.is_wall_open(x, y, maze::direction::left))
+            if (!mz.is_wall_open({x, y}, maze::direction::left))
                 draw_vert_line(img, image_x, image_y, total_height, wall_width, wall_color);
 
             ++progress;
@@ -299,38 +303,38 @@ void draw_task(std::size_t &progress, const maze &mz, image &img, maze::len_t y,
     }
 }
 
-void draw_exit(const maze &mz, image &img, maze::len_t x, maze::len_t y, uint64_t cell_width, uint64_t cell_height, uint64_t wall_width, uint16_t *cell_color)
+void draw_exit(const maze &mz, image &img, pt p, uint64_t cell_width, uint64_t cell_height, uint64_t wall_width, uint16_t *cell_color)
 {
     // if on left wall
-    if (x == 0)
+    if (p.x == 0)
     {
         draw_vert_line(img,
                        0,                                                            // image_x
-                       (cell_height + wall_width) * y + wall_width, // image_y
+                       (cell_height + wall_width) * p.y + wall_width, // image_y
                        cell_height, wall_width, cell_color);
     }
     // if on right wall
-    else if (x == mz.width() - 1)
+    else if (p.x == mz.width() - 1)
     {
         draw_vert_line(img,
-                       (cell_width + wall_width) * x + cell_width + wall_width, // image_x
-                       (cell_height + wall_width) * y + wall_width,             // image_y
+                       (cell_width + wall_width) * p.x + cell_width + wall_width, // image_x
+                       (cell_height + wall_width) * p.y + wall_width,             // image_y
                        cell_height, wall_width, cell_color);
     }
     // if on top wall
-    else if (y == 0)
+    else if (p.y == 0)
     {
         draw_horiz_line(img,
-                        (cell_width + wall_width) * x + wall_width, // image_x
+                        (cell_width + wall_width) * p.x + wall_width, // image_x
                         0,                                                           // image_y
                         cell_width, wall_width, cell_color);
     }
     // if on bottom wall
-    else if (y == mz.height() - 1)
+    else if (p.y == mz.height() - 1)
     {
         draw_horiz_line(img,
-                        (cell_width + wall_width) * x + wall_width,                // image_x
-                        (cell_height + wall_width) * y + cell_height + wall_width, // image_y
+                        (cell_width + wall_width) * p.x + wall_width,                // image_x
+                        (cell_height + wall_width) * p.y + cell_height + wall_width, // image_y
                         cell_width, wall_width, cell_color);
     }
 }
@@ -428,11 +432,11 @@ void draw_image(const maze &mz, image &img, uint64_t cell_width, uint64_t cell_h
     ++progress_singles;
 
     // draw entrance
-    draw_exit(mz, img, mz.entrance_pt_x(), mz.entrance_pt_y(), cell_width, cell_height, wall_width, cell_color);
+    draw_exit(mz, img, mz.entrance(), cell_width, cell_height, wall_width, cell_color);
     ++progress_singles;
 
     // draw exit
-    draw_exit(mz, img, mz.exit_pt_x(), mz.exit_pt_y(), cell_width, cell_height, wall_width, cell_color);
+    draw_exit(mz, img, mz.exit(), cell_width, cell_height, wall_width, cell_color);
     ++progress_singles;
 
     progress_thread.join();
@@ -497,7 +501,8 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
                      "    -o [MAZE NAME].png                        Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)\n"
                      "    -s [SEED]                                 Sets the seed of the maze to be generated (Defaults to a random seed)\n"
                      "    --rb                                      Use recursive backtracking algorithm (default)\n"
-                     "    --w                                       Use Wilson's algorithm\n";
+                     "    --w                                       Use Wilson's algorithm\n"
+                     "    --rd                                      Use recursive division algorithm\n";
         std::exit(0);
     }
 
@@ -516,6 +521,7 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
 
     bool found_rb = false;
     bool found_w = false;
+    bool found_rd = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -695,18 +701,27 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
         }
         else if (strcmp(argv[i], "--rb") == 0)
         {
-            if (found_w)
+            if (found_w || found_rd)
             {
-                std::cout << "Ignoring second algorithm type...\n";
+                std::cout << "Ignoring repeated algorithm type...\n";
                 continue;
             }
             found_rb = true;
         }
+        else if (strcmp(argv[i], "--rd") == 0)
+        {
+            if (found_w || found_rb)
+            {
+                std::cout << "Ignoring repeated algorithm type...\n";
+                continue;
+            }
+            found_rd = true;
+        }
         else if (strcmp(argv[i], "--w") == 0)
         {
-            if (found_rb)
+            if (found_rb || found_rd)
             {
-                std::cout << "Ignoring second algorithm type...\n";
+                std::cout << "Ignoring repeated algorithm type...\n";
                 continue;
             }
             found_w = true;
@@ -744,6 +759,8 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
         algorithm = algorithm_type::recursive_backtracker;
     else if (found_w)
         algorithm = algorithm_type::wilsons;
+    else if (found_rd)
+        algorithm = algorithm_type::recursive_division;
     else
         algorithm = algorithm_type::recursive_backtracker;
 
