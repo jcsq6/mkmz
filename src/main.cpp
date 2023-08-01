@@ -93,6 +93,7 @@ int main(int argc, char *argv[])
 
     image res;
     pt entrance, exit;
+    double difficulty;
 
     {
         std::cout << "Generating maze...\n";
@@ -126,6 +127,7 @@ int main(int argc, char *argv[])
 
         entrance = m.entrance();
         exit = m.exit();
+        difficulty = m.difficulty();
 
         seed = m.get_seed();
 
@@ -170,6 +172,20 @@ int main(int argc, char *argv[])
         break;
     }
 
+    const char *difficulty_str;
+    if (difficulty < 30)
+        difficulty_str = "Ridiculously Easy";
+    else if (difficulty < 150)
+        difficulty_str = "Easy";
+    else if (difficulty < 500)
+        difficulty_str = "Medium Difficulty";
+    else if (difficulty < 1000)
+        difficulty_str = "Hard";
+    else if (difficulty < 2000)
+        difficulty_str = "Ridiculously Hard";
+    else
+        difficulty_str = "Humanly Impossible";
+
     std::cout << "Writing image...\n";
     auto begin = std::chrono::high_resolution_clock::now();
     try
@@ -183,6 +199,7 @@ int main(int argc, char *argv[])
             std::pair<std::string, std::string>{"Maze Entrance", get_coords(entrance.x, entrance.y)},
             std::pair<std::string, std::string>{"Maze Exit", get_coords(exit.x, exit.y)},
             std::pair<std::string, std::string>{"Maze Generation Algorithm", algorithm_name},
+            std::pair<std::string, std::string>{"Maze difficulty", std::to_string(difficulty) + " (" + difficulty_str + ')'},
         };
         res.write(image_name, chunks, 5, progress_bar);
     }
@@ -197,14 +214,14 @@ int main(int argc, char *argv[])
     std::uintmax_t size = std::filesystem::file_size(image_name);
     double d = static_cast<double>(size);
     int i = 0;
-    for (; d >= 1024; d /= 1024, ++i)
-        ;
+    for (; d >= 1024; d /= 1024, ++i);
     d = static_cast<unsigned int>(d * 10) / 10.0;
 
     std::cout << "\nMaze generated with the following properties: \n";
     std::cout << "\tMaze dimensions: (" << maze_width << ", " << maze_height << ")\n";
     std::cout << "\tMaze entrance: (" << entrance.x << ", " << entrance.y << ")\n";
     std::cout << "\tMaze exit: (" << exit.x << ", " << exit.y << ")\n";
+    std::cout << "\tMaze difficulty: " << difficulty << " (" << difficulty_str << ")\n";
     std::cout << "\tMaze Generation Algorithm: " << algorithm_name << '\n';
     std::cout << "\tMaze seed: " << seed << '\n';
     std::cout << "\tImage name: " << image_name << '\n';
@@ -541,8 +558,16 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
 
             ++i;
 
-            cell_width = std::stoull(match[1].str());
-            cell_height = std::stoull(match[2].str());
+            try
+            {
+                cell_width = std::stoull(match[1].str());
+                cell_height = std::stoull(match[2].str());
+            }
+            catch(...)
+            {
+                std::cout << "Invalid arguments passed to -cdims, aborting...\n";
+                std::exit(0);
+            }
 
             found_cdims = true;
         }
@@ -562,8 +587,22 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
 
             ++i;
 
-            maze_width = std::stoull(match[1].str());
-            maze_height = std::stoull(match[2].str());
+            try
+            {
+                maze_width = std::stoull(match[1].str());
+                maze_height = std::stoull(match[2].str());
+            }
+            catch(...)
+            {
+                std::cout << "Invalid arguments passed to -dims, aborting...\n";
+                std::exit(0);
+            }
+
+            if (maze_width < 2 || maze_height < 2)
+            {
+                std::cout << "Maze width/height must be greater than 1\n";
+                std::exit(0);
+            }
 
             found_dims = true;
         }
@@ -583,22 +622,30 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
 
             ++i;
 
-            wall_color[0] = std::stoull(match[1].str());
-            if (match[2].matched)
-                wall_color[1] = std::stoull(match[2].str());
-            else
-                wall_color[1] = 0;
-            
-            if (match[3].matched)
-                wall_color[2] = std::stoull(match[3].str());
-            else
-                wall_color[2] = 0;
-            
-            if (match[4].matched)
-                wall_color[3] = std::stoull(match[4].str());
-            else
-                wall_color[3] = 255;
+            try
+            {
+                wall_color[0] = std::stoull(match[1].str());
+                if (match[2].matched)
+                    wall_color[1] = std::stoull(match[2].str());
+                else
+                    wall_color[1] = 0;
 
+                if (match[3].matched)
+                    wall_color[2] = std::stoull(match[3].str());
+                else
+                    wall_color[2] = 0;
+
+                if (match[4].matched)
+                    wall_color[3] = std::stoull(match[4].str());
+                else
+                    wall_color[3] = 255;
+            }
+            catch(...)
+            {
+                std::cout << "Invalid arguments passed to -wcol, aborting...\n";
+                std::exit(0);
+            }
+            
             found_wcol = true;
         }
         else if (strcmp(argv[i], "-ccol") == 0)
@@ -617,19 +664,27 @@ void process_args(int argc, char *argv[], std::string &name, uint64_t &maze_widt
 
             ++i;
 
-            cell_color[0] = std::stoull(match[1].str());
-            if (match[2].matched)
-                cell_color[1] = std::stoull(match[2].str());
-            else
-                cell_color[1] = 0;
-            if (match[3].matched)
-                cell_color[2] = std::stoull(match[3].str());
-            else
-                cell_color[2] = 0;
-            if (match[4].matched)
-                cell_color[3] = std::stoull(match[4].str());
-            else
-                cell_color[3] = 255;
+            try
+            {
+                cell_color[0] = std::stoull(match[1].str());
+                if (match[2].matched)
+                    cell_color[1] = std::stoull(match[2].str());
+                else
+                    cell_color[1] = 0;
+                if (match[3].matched)
+                    cell_color[2] = std::stoull(match[3].str());
+                else
+                    cell_color[2] = 0;
+                if (match[4].matched)
+                    cell_color[3] = std::stoull(match[4].str());
+                else
+                    cell_color[3] = 255;
+            }
+            catch (...)
+            {
+                std::cout << "Invalid arguments passed to -ccol, aborting...\n";
+                std::exit(0);
+            }
 
             found_ccol = true;
         }

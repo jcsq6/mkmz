@@ -24,8 +24,8 @@ public:
         left = 3,
     };
 
-    inline maze() : m_data{}, m_width{}, m_height{}, m_entrance{}, m_exit{}, has_seed{}, progress{} {}
-    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, m_entrance{}, m_exit{}, has_seed{}, progress{}
+    inline maze() : m_data{}, m_width{}, m_height{}, m_entrance{}, m_exit{}, m_difficulty{}, has_seed{}, progress{} {}
+    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, m_entrance{}, m_exit{}, m_difficulty{}, has_seed{}, progress{}
     {
     }
 
@@ -40,6 +40,8 @@ public:
 
     inline pt entrance() const { return m_entrance; }
     inline pt exit() const { return m_exit; }
+
+    inline double difficulty() const { return m_difficulty; }
 
     // fun is a function who takes a double between 0 and 1 representing progress
     inline void set_progress_callback(std::function<void(double)> fun) { progress = std::move(fun); }
@@ -85,6 +87,8 @@ private:
 
     pt m_entrance;
     pt m_exit;
+
+    double m_difficulty;
 
     std::uint_least32_t m_seed;
     bool has_seed;

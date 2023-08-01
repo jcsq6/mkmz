@@ -10,8 +10,7 @@
 </div>
 
 ## About The Program
-
-The goal of this program was to be able to generate mazes of any size as large as your computer can. This includes ridiculously large mazes. If you have a lot of memory, by all means, generate a 1,000,000*1,000,000 maze! The mazes are also very customizable, meaning that they don't have to be square. The same applies to the cell width and height-- the cells don't have to be square cells.
+This program is a maze generator that generates png mazes of any size. You can also choose the algorithm used to generate the maze. The maze is stored in memory as optimally as possible without compression (2 bits for each cell), allowing you to generate huge mazes without excess memory. The generator also picks an exit point most difficult to get to, and produces a difficulty score for the generated maze.
 
 ### Example Output  
 <br />
@@ -56,9 +55,11 @@ The goal of this program was to be able to generate mazes of any size as large a
 *Generates mazes with many box-like sub-groups*
 
 # Notes
-* ***You can generate as big a maze as your computer will allow.***  
+* ***You can generate as big a maze as your computer will allow***  
 * ***Any R, G, B colors that are ommitted will be set to 0, and any omitted A will be set to 255***
-* ***The maze entrance for the recursive backtracking algorithm will always be (0,0), and the exit will be the farthest point on any wall from (0,0)***  
+* ***The maze entrance for the recursive backtracking algorithm will always be (0,0), and the exit will be the "most difficult" point on any wall from (0,0)***  
+* ***What it means to be the "most difficult point" is a combination of how many choices you had to make to get there, along with how many cells it is from the entrance***
+* ***The maze comes with a difficulty score. The higher it is, the more difficult the maze has been analyzed to be***
 * ***The maze seed and other relevant info are put into the generated png's text chunks***  
 
 ### Built With
