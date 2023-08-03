@@ -34,18 +34,10 @@ enum class color_t : uint64_t
 class image
 {
 public:
+    static bool within_limits(uint64_t width, uint64_t height);
+
     inline image() : m_width{}, m_height{}, m_depth{}, m_col{} {}
-    inline image(uint64_t width, uint64_t height, int depth, color_t col) : m_width{width}, m_height{height}, m_depth{depth}, m_col{col}
-    {
-        if (width > std::numeric_limits<uint32_t>::max() || height > std::numeric_limits<uint32_t>::max())
-            throw std::length_error("Image dimensions too large\n");
-        assert_color_depth(col, depth);
-        row_locks = std::vector<std::mutex>(m_height);
-        m_data.resize(height);
-        auto len = row_len();
-        for (auto &row : m_data)
-            row.resize(len);
-    }
+    image(uint64_t width, uint64_t height, int depth, color_t col);
 
     inline image(const image &other) : m_width{other.m_width}, m_height{other.m_height}, m_depth{other.m_depth}, m_col{other.m_col}, m_data{other.m_data}, row_locks(m_height)
     {
@@ -180,6 +172,8 @@ private:
         case color_t::rgba:
             if (depth == 8)
                 return;
+        case color_t::none:
+            break;
         }
 
         throw std::runtime_error("Invalid color + depth combination");

@@ -22,10 +22,25 @@ public:
         right = 1,
         down = 2,
         left = 3,
+        none = -1
     };
 
-    inline maze() : m_data{}, m_width{}, m_height{}, m_entrance{}, m_exit{}, m_difficulty{}, has_seed{}, progress{} {}
-    inline maze(len_t width, len_t height) : m_data{}, m_width{width}, m_height{height}, m_entrance{}, m_exit{}, m_difficulty{}, has_seed{}, progress{}
+    inline maze() : 
+        m_data{},
+        m_width{}, m_height{},
+        m_entrance{}, m_exit{},
+        m_solution_branch_count{}, m_solution_distance{}, m_difficulty{},
+        has_seed{},
+        progress{}
+    {
+    }
+    inline maze(len_t width, len_t height) :
+        m_data{},
+        m_width{width}, m_height{height},
+        m_entrance{}, m_exit{},
+        m_solution_branch_count{}, m_solution_distance{}, m_difficulty{},
+        has_seed{},
+        progress{}
     {
     }
 
@@ -40,6 +55,9 @@ public:
 
     inline pt entrance() const { return m_entrance; }
     inline pt exit() const { return m_exit; }
+    
+    inline len_t solution_branch_count() const { return m_solution_branch_count; }
+    inline len_t solution_distance() const { return m_solution_distance; }
 
     inline double difficulty() const { return m_difficulty; }
 
@@ -67,6 +85,9 @@ public:
         has_seed = true;
     }
 
+    // set random seed
+    void set_seed();
+
     std::uint_least32_t get_seed();
 
     void gen_recursive_backtracker();
@@ -88,6 +109,8 @@ private:
     pt m_entrance;
     pt m_exit;
 
+    len_t m_solution_distance;
+    len_t m_solution_branch_count;
     double m_difficulty;
 
     std::uint_least32_t m_seed;
@@ -96,6 +119,10 @@ private:
     std::function<void(double)> progress;
 
     void find_exits(len_t &count);
+    // returns true if p branches into more than or equal to n cells by first moving dir
+    template <len_t n>
+    bool explore_n(pt p, direction dir) const;
+    len_t get_num_available(pt p, maze::direction prev_opp) const;
 
     template <state s>
     void set_wall(pt p, direction dir);

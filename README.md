@@ -10,7 +10,46 @@
 </div>
 
 ## About The Program
-This program is a maze generator that generates png mazes of any size. You can also choose the algorithm used to generate the maze. The maze is stored in memory as optimally as possible without compression (2 bits for each cell), allowing you to generate huge mazes without excess memory. The generator also picks an exit point most difficult to get to, and produces a difficulty score for the generated maze.
+This program is a maze generator that generates png mazes of any size. The maze is stored in memory as optimally as possible without compression (2 bits for each cell), allowing you to generate huge mazes without excess memory. 
+
+The generator also picks an exit point most difficult to get to, and produces a difficulty score for the generated maze.  
+The generator return's a "Solution branch count" which is the number of reasonable branches the solution path has.  
+A "reasonable" branch is a branch that cannot be immediately discerned to be a dead end.
+The difficulty score is based off of a combination of the solution branch count and the distance of the solution.
+
+You can also choose the algorithm used to generate the maze.
+The available algorithms are currently-  
+1. ***Recursive backtracker***
+    - ***Difficulty***
+      - Statistically generates on average the easiest mazes
+      - Average difficulty score of 4.35 for 99x99 sized mazes
+      - Average solution branch count of 66.1 for 99x99 sized mazes
+    - ***Speed***
+      - Suitable for mazes of any size
+      - Very fast
+    - ***Traits***
+      - Generates mazes with long corridors
+2. ***Wilson's algorithm***
+    - ***Difficulty***
+      - Statistically generates on average the second hardest mazes
+      - Average difficulty score of 4.59 for 99x99 sized mazes
+      - Average solution branch count of 90.52 for 99x99 sized mazes
+    - ***Speed***
+      - Not suitable for extremely large mazes
+      - Slowest algorithm
+      - Wilsons' algorithm should only typically be used for small mazes, as it takes exponentially longer the larger the maze
+    - **Traits**
+      - Generates mazes along a uniform distribution, leading to a good balance between different corridors
+3. **Recursive division**
+    - ***Difficulty***
+        - Statistically generates on average the hardest mazes
+        - Average difficulty score of 4.73 for 99x99 sized mazes
+        - Average solution branch count of 104.09 for 99x99 sized mazes
+    - ***Speed***
+      - Suitable for mazes of any size
+      - Fastest algorithm
+    - ***Traits***
+      - Generates mazes with many box-like sub-groups
 
 ### Example Output  
 <br />
@@ -28,31 +67,24 @@ This program is a maze generator that generates png mazes of any size. You can a
 *Set the dimensions of the maze (required)*  
 * ```-o [FileName]```  
 *Specify name of output file (**Optional**)*  
-* ```-cdims "[CELL WIDTH], [CELL_HEIGHT]"```  
+* ```-cdims "[CellWidth], [CellHeight]"```  
 *Set the dimensions in pixels of each cell in the maze (defaults to "1,1")*  
-* ```-ww [WALL WIDTH]```  
+* ```-ww [WallWidth]```  
 *Set the width of the walls in pixels (defaults to 1)*  
 * ```-wcol "[R], [G], [B], [A]"```  
 *Set the color of the walls in rgba values ranged 0-255 (Defaults to "0, 0, 0, 255")*  
 * ```-ccol "[R], [G], [B], [A]"```  
 *Set the color of the cells in rgba values ranged 0-255 (Defaults to "255, 255, 255, 255")*  
-* ```-o [MAZE NAME].png```  
+* ```-o [MazeName].png```  
 *Sets the name of the resulting image (Defaults to [WIDTH]x[HEIGHT]_maze.png)*  
 * ```-s [SEED]```  
 *Sets the seed of the maze to be generated (Defaults to a random seed)*  
 * ```--rb```  
 *Use recursive backtracking algorithm (default)*  
-*Recursive backtracking can be used for any size of maze, and is generally very fast*  
-*Generates mazes with long corridors*
 * ```--w```  
 *Use Wilson's algorithm*  
-*Wilsons' algorithm should only typically be used for small mazes, as it takes exponentially longer the larger the maze*  
-*Generates mazes along a uniform distribution, leading to a good balance between different corridors*  
 * ```--rd```  
 *Use recursive division algorithm*  
-*Fastest algorithm*  
-*This algorithm is very fast for mazes of any size.*  
-*Generates mazes with many box-like sub-groups*
 
 # Notes
 * ***You can generate as big a maze as your computer will allow***  

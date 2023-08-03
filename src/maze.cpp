@@ -8,8 +8,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <iostream>
-
 constexpr char opposite(char d)
 {
 	return (d + 2) % 4;
@@ -101,9 +99,53 @@ struct connection
 	std::unordered_map<pt, end_pt, pt_hash> end;
 };
 
+template <maze::len_t n>
+bool maze::explore_n(pt p, maze::direction dir) const
+{
+	move(p, dir);
+
+	direction prev_opp_dir = opposite(dir);
+	
+	if (direction::up != prev_opp_dir && p.y < m_height - 1 && get_wall(p, direction::up) == state::open &&	explore_n<n - 1>(p, direction::up))
+		return true;
+	
+	if (direction::right != prev_opp_dir && p.x < m_width - 1 && get_wall(p, direction::right) == state::open && explore_n<n - 1>(p, direction::right))
+		return true;
+	
+	if (direction::down != prev_opp_dir && p.y && get_wall(p, direction::down) == state::open && explore_n<n - 1>(p, direction::down))
+		return true;
+	
+	if (direction::left != prev_opp_dir && p.x && get_wall(p, direction::left) == state::open && explore_n<n - 1>(p, direction::left))
+		return true;
+
+	return false;
+}
+
+template <>
+bool maze::explore_n<1>(pt p, maze::direction dir) const
+{	
+	return true;
+}
+
+maze::len_t maze::get_num_available(pt p, maze::direction prev_opp) const
+{
+	len_t available = 0;
+	if (prev_opp != direction::up && p.y < m_height - 1 && get_wall(p, direction::up) == state::open && explore_n<10>(p, direction::up))
+		++available;
+	if (prev_opp != direction::right && p.x < m_width - 1 && get_wall(p, direction::right) == state::open && explore_n<10>(p, direction::right))
+		++available;
+	if (prev_opp != direction::down && p.y && get_wall(p, direction::down) == state::open && explore_n<10>(p, direction::down))
+		++available;
+	if (prev_opp != direction::left && p.x && get_wall(p, direction::left) == state::open && explore_n<10>(p, direction::left))
+		++available;
+	
+	return available;
+}
+
 void maze::find_exits(len_t &count)
 {
 	len_t total = m_width * m_height;
+
 	// find exits
 	connection entrance(m_width, m_height);
 
@@ -111,59 +153,53 @@ void maze::find_exits(len_t &count)
 	pt p = p_init;
 
 	std::vector<direction> stack;
+	std::vector<len_t> choice_stack;
 	std::vector<bool> visited(total);
 
 	len_t i = 1;
 	++count;
 
-	bool last_was_forwards = true;
-	len_t choice_count = 0;
-	char last_dir_opp = -1;
+	len_t cur_choice = get_num_available(p, direction::none);
+	len_t choice_count = cur_choice > 1 ? cur_choice : 0;
 
 	len_t distance = 0;
 	do
 	{
-		bool open[4]{};
-		len_t available = 0;
-		for (char d = 0; d < 4; ++d)
-			if (open[d] = (d != last_dir_opp && get_wall(p, static_cast<direction>(d)) == state::open))
-				++available;
-
 		direction dir;
-		if (p.y < m_height - 1 && !visited[(p.y + 1) * m_width + p.x] && open[static_cast<char>(direction::up)])
+		
+		if (p.y < m_height - 1 && !visited[(p.y + 1) * m_width + p.x] && get_wall(p, direction::up) == state::open)
 			dir = direction::up;
-		else if (p.x < m_width - 1 && !visited[p.y * m_width + p.x + 1] && open[static_cast<char>(direction::right)])
+		else if (p.x < m_width - 1 && !visited[p.y * m_width + p.x + 1] && get_wall(p, direction::right) == state::open)
 			dir = direction::right;
-		else if (p.y && !visited[(p.y - 1) * m_width + p.x] && open[static_cast<char>(direction::down)])
+		else if (p.y && !visited[(p.y - 1) * m_width + p.x] && get_wall(p, direction::down) == state::open)
 			dir = direction::down;
-		else if (p.x && !visited[p.y * m_width + p.x - 1] && open[static_cast<char>(direction::left)])
+		else if (p.x && !visited[p.y * m_width + p.x - 1] && get_wall(p, direction::left) == state::open)
 			dir = direction::left;
 		else
 		{
-			move(p, opposite(stack.back()));
-			last_dir_opp = static_cast<char>(stack.back());
-			stack.pop_back();
-			--distance;
-			if (available > 1)
-				choice_count -= available;
+			choice_count -= choice_stack.back();
 
-			last_was_forwards = false;
+			move(p, opposite(stack.back()));
+			stack.pop_back();
+			choice_stack.pop_back();
+			--distance;
 
 			continue;
 		}
 		
 
-		if (last_was_forwards && available > 1)
-			choice_count += available;
-
 		move(p, dir);
 		stack.push_back(dir);
-		last_dir_opp = opposite(static_cast<char>(dir));
-		visited[p.y * m_width + p.x] = true;
+
 		++count;
 		++i;
 		++distance;
-		last_was_forwards = true;
+
+		cur_choice = get_num_available(p, opposite(dir));
+		choice_stack.push_back(cur_choice > 1 ? cur_choice : 0);
+		choice_count += choice_stack.back();
+
+		visited[p.y * m_width + p.x] = true;
 
 		if (p.x == 0 || p.y == 0 || p.x == m_width - 1 || p.y == m_height - 1)
 		{
@@ -177,7 +213,7 @@ void maze::find_exits(len_t &count)
 	double max_factor = 0;
 	for (auto it = entrance.end.begin(); it != entrance.end.end(); ++it)
 	{
-		double factor = it->second.choice_count * .4 + it->second.final_distance * .6;
+		double factor = .95 * std::log(it->second.choice_count + 1) + .05 * std::log(it->second.final_distance + 1);
 		if (factor > max_factor)
 		{
 			max = it;
@@ -189,15 +225,23 @@ void maze::find_exits(len_t &count)
 
 	m_entrance = {};
 	m_exit = max->first;
+
+	m_solution_branch_count = max->second.choice_count;
+	m_solution_distance = max->second.final_distance;
+}
+
+void maze::set_seed()
+{
+	has_seed = true;
+	std::random_device rd;
+	m_seed = rd();
 }
 
 unsigned int maze::get_seed()
 {
-	if (has_seed)
-		return m_seed;
-	has_seed = true;
-	std::random_device rd;
-	return m_seed = rd();
+	if (!has_seed)
+		set_seed();
+	return m_seed;
 }
 
 void maze::gen_recursive_backtracker()
@@ -390,8 +434,6 @@ void maze::divide(std::mt19937 &gen, pt p, maze::len_t width, maze::len_t height
 			divide(gen, p, next_width, height, get_orientation_is_horiz(gen, next_width, height), count);
 	}
 }
-
-#include <fstream>
 
 void maze::gen_recursive_division()
 {
